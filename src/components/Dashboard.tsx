@@ -778,7 +778,7 @@ export function Dashboard() {
                   </div>
                   <div>
                     <Label>Tipo *</Label>
-                    <Select value={formData.tipo} onValueChange={(v: 'Visto' | 'Passaporte') => setFormData(prev => ({ ...prev, tipo: v }))}>
+                    <Select value={formData.tipo || 'Visto'} onValueChange={(v: 'Visto' | 'Passaporte') => setFormData(prev => ({ ...prev, tipo: v }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -1001,7 +1001,7 @@ export function Dashboard() {
                                 {c.agencia}
                               </TableCell>
                               <TableCell>
-                                <Select value={c.tipo} onValueChange={v => quickUpdate(c.id, 'tipo', v)}>
+                                <Select value={c.tipo || 'Visto'} onValueChange={v => quickUpdate(c.id, 'tipo', v)}>
                                   <SelectTrigger className="h-8 w-24"><SelectValue /></SelectTrigger>
                                   <SelectContent>
                                     {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -1009,7 +1009,7 @@ export function Dashboard() {
                                 </Select>
                               </TableCell>
                               <TableCell>
-                                <Select value={c.cidade || NONE_VALUE} onValueChange={v => quickUpdate(c.id, 'cidade', v)}>
+                                <Select value={c.cidade || NONE_VALUE} onValueChange={v => quickUpdate(c.id, 'cidade', v === NONE_VALUE ? '' : v)}>
                                   <SelectTrigger className="h-8 w-28"><SelectValue placeholder="Selecione" /></SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value={NONE_VALUE}>Selecione</SelectItem>
@@ -1047,7 +1047,7 @@ export function Dashboard() {
                               </TableCell>
                               <TableCell>
                                 {c.tipo === 'Visto' ? (
-                                  <Select value={c.situacao || NONE_VALUE} onValueChange={v => quickUpdate(c.id, 'situacao', v)}>
+                                  <Select value={c.situacao || NONE_VALUE} onValueChange={v => quickUpdate(c.id, 'situacao', v === NONE_VALUE ? '' : v)}>
                                     <SelectTrigger className="h-8 w-28"><SelectValue placeholder="--" /></SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value={NONE_VALUE}>--</SelectItem>
