@@ -50,8 +50,6 @@ import {
   Plus, 
   Save, 
   X, 
-  Search, 
-  Filter, 
   Download, 
   Trash2, 
   Eye, 
@@ -59,10 +57,7 @@ import {
   Edit,
   History,
   FileText,
-  BarChart3,
   AlertTriangle,
-  Wifi,
-  WifiOff,
   RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -72,6 +67,8 @@ import autoTable from 'jspdf-autotable';
 const CIDADES = ['São Paulo', 'Rio de Janeiro', 'Brasilia', 'Porto Alegre', 'Recife'];
 const SITUACOES = ['Aguardando', 'Aprovado', 'Aprovado só CASV', 'CASV', 'Consulado', 'Reprovado'];
 const TIPOS = ['Visto', 'Passaporte'];
+const ALL_VALUE = '__ALL__';
+const NONE_VALUE = '__NONE__';
 
 export function Dashboard() {
   const { user, dbStatus, logout } = useAuth();
@@ -143,24 +140,6 @@ export function Dashboard() {
     return `${day}/${month}/${year}`;
   };
 
-  const getStatusBadge = (situacao: string) => {
-    const styles: Record<string, string> = {
-      'Aprovado': 'bg-green-100 text-green-800 border-green-200',
-      'Reprovado': 'bg-red-100 text-red-800 border-red-200',
-      'CASV': 'bg-blue-100 text-blue-800 border-blue-200',
-      'Aprovado só CASV': 'bg-emerald-100 text-emerald-800 border-emerald-200',
-      'Aguardando': 'bg-purple-100 text-purple-800 border-purple-200',
-      'Consulado': 'bg-violet-100 text-violet-800 border-violet-200',
-    };
-    
-    const style = styles[situacao] || 'bg-gray-100 text-gray-800 border-gray-200';
-    return (
-      <Badge variant="outline" className={style}>
-        {situacao || 'Não Definido'}
-      </Badge>
-    );
-  };
-
   // Load clients
   const loadClientes = useCallback(async () => {
     try {
@@ -188,7 +167,6 @@ export function Dashboard() {
         };
       });
 
-      // Sort: Vistos first, then by date
       data.sort((a, b) => {
         if (a.tipo === 'Visto' && b.tipo === 'Passaporte') return -1;
         if (a.tipo === 'Passaporte' && b.tipo === 'Visto') return 1;
@@ -275,7 +253,6 @@ export function Dashboard() {
         if (finalized && !hasActiveFilters) return false;
       }
 
-      // Passaportes filter - only current month
       if (!showHidden && !hasActiveFilters && c.tipo === 'Passaporte') {
         if (c.dataInclusao) {
           const incDate = new Date(c.dataInclusao);
@@ -450,6 +427,10 @@ export function Dashboard() {
     const c = clientes.find(x => x.id === id);
     if (!c) return;
 
+    // Handle special values
+    if (value === NONE_VALUE) value = '';
+    if (value === ALL_VALUE) return;
+    
     if (['nome', 'agencia'].includes(field)) value = value.toUpperCase().trim();
 
     if (field === 'situacao' && value === 'Aguardando') {
@@ -615,7 +596,6 @@ export function Dashboard() {
       yPos = (doc as any).lastAutoTable.finalY + 10;
     }
 
-    // Summary
     if (yPos > 250) {
       doc.addPage();
       yPos = 20;
@@ -665,6 +645,15 @@ export function Dashboard() {
 
   const stats = getStats();
   const hiddenCount = clientes.filter(c => c.deleted).length;
+
+  // Helper for filter selects
+  const handleFilterChange = (field: keyof FilterState, value: string) => {
+    if (value === ALL_VALUE) {
+      setFilters(prev => ({ ...prev, [field]: '' }));
+    } else {
+      setFilters(prev => ({ ...prev, [field]: value }));
+    }
+  };
 
   if (loading) {
     return (
@@ -798,9 +787,10 @@ export function Dashboard() {
                   </div>
                   <div>
                     <Label>Cidade</Label>
-                    <Select value={formData.cidade} onValueChange={v => setFormData(prev => ({ ...prev, cidade: v }))}>
+                    <Select value={formData.cidade || NONE_VALUE} onValueChange={v => setFormData(prev => ({ ...prev, cidade: v === NONE_VALUE ? '' : v }))}>
                       <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                       <SelectContent>
+                        <SelectItem value={NONE_VALUE}>Selecione...</SelectItem>
                         {CIDADES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -833,9 +823,10 @@ export function Dashboard() {
                       </div>
                       <div>
                         <Label>Situação</Label>
-                        <Select value={formData.situacao} onValueChange={v => setFormData(prev => ({ ...prev, situacao: v }))}>
+                        <Select value={formData.situacao || NONE_VALUE} onValueChange={v => setFormData(prev => ({ ...prev, situacao: v === NONE_VALUE ? '' : v }))}>
                           <SelectTrigger><SelectValue placeholder="-- Selecione --" /></SelectTrigger>
                           <SelectContent>
+                            <SelectItem value={NONE_VALUE}>-- Selecione --</SelectItem>
                             {SITUACOES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                           </SelectContent>
                         </Select>
@@ -889,40 +880,40 @@ export function Dashboard() {
                   </div>
                   <div>
                     <Label>Agência</Label>
-                    <Select value={filters.agencia} onValueChange={v => setFilters(prev => ({ ...prev, agencia: v }))}>
+                    <Select value={filters.agencia || ALL_VALUE} onValueChange={v => handleFilterChange('agencia', v)}>
                       <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todas</SelectItem>
+                        <SelectItem value={ALL_VALUE}>Todas</SelectItem>
                         {agencias.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
                     <Label>Cidade</Label>
-                    <Select value={filters.cidade} onValueChange={v => setFilters(prev => ({ ...prev, cidade: v }))}>
+                    <Select value={filters.cidade || ALL_VALUE} onValueChange={v => handleFilterChange('cidade', v)}>
                       <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todas</SelectItem>
+                        <SelectItem value={ALL_VALUE}>Todas</SelectItem>
                         {CIDADES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
                     <Label>Tipo</Label>
-                    <Select value={filters.tipo} onValueChange={v => setFilters(prev => ({ ...prev, tipo: v }))}>
+                    <Select value={filters.tipo || ALL_VALUE} onValueChange={v => handleFilterChange('tipo', v)}>
                       <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos</SelectItem>
+                        <SelectItem value={ALL_VALUE}>Todos</SelectItem>
                         {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
                     <Label>Situação</Label>
-                    <Select value={filters.situacao} onValueChange={v => setFilters(prev => ({ ...prev, situacao: v }))}>
+                    <Select value={filters.situacao || ALL_VALUE} onValueChange={v => handleFilterChange('situacao', v)}>
                       <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todas</SelectItem>
+                        <SelectItem value={ALL_VALUE}>Todas</SelectItem>
                         <SelectItem value="Não definido">Não definido</SelectItem>
                         {SITUACOES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                       </SelectContent>
@@ -1018,9 +1009,10 @@ export function Dashboard() {
                                 </Select>
                               </TableCell>
                               <TableCell>
-                                <Select value={c.cidade} onValueChange={v => quickUpdate(c.id, 'cidade', v)}>
+                                <Select value={c.cidade || NONE_VALUE} onValueChange={v => quickUpdate(c.id, 'cidade', v)}>
                                   <SelectTrigger className="h-8 w-28"><SelectValue placeholder="Selecione" /></SelectTrigger>
                                   <SelectContent>
+                                    <SelectItem value={NONE_VALUE}>Selecione</SelectItem>
                                     {CIDADES.map(ci => <SelectItem key={ci} value={ci}>{ci}</SelectItem>)}
                                   </SelectContent>
                                 </Select>
@@ -1055,9 +1047,10 @@ export function Dashboard() {
                               </TableCell>
                               <TableCell>
                                 {c.tipo === 'Visto' ? (
-                                  <Select value={c.situacao} onValueChange={v => quickUpdate(c.id, 'situacao', v)}>
+                                  <Select value={c.situacao || NONE_VALUE} onValueChange={v => quickUpdate(c.id, 'situacao', v)}>
                                     <SelectTrigger className="h-8 w-28"><SelectValue placeholder="--" /></SelectTrigger>
                                     <SelectContent>
+                                      <SelectItem value={NONE_VALUE}>--</SelectItem>
                                       {SITUACOES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                                     </SelectContent>
                                   </Select>
@@ -1122,7 +1115,6 @@ export function Dashboard() {
                   })}
                 </div>
 
-                {/* Simple chart visualization */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {Object.entries(stats).filter(([_, v]) => v > 0).map(([key, value]) => {
                     const total = Object.values(stats).reduce((a, b) => a + b, 0);
@@ -1151,7 +1143,6 @@ export function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* Agency breakdown */}
             <Card>
               <CardHeader>
                 <CardTitle>🏢 Por Agência</CardTitle>
@@ -1249,30 +1240,30 @@ export function Dashboard() {
             </div>
             <div>
               <Label>Agência (opcional)</Label>
-              <Select value={pdfFilters.agencia} onValueChange={v => setPdfFilters(prev => ({ ...prev, agencia: v }))}>
+              <Select value={pdfFilters.agencia || ALL_VALUE} onValueChange={v => setPdfFilters(prev => ({ ...prev, agencia: v === ALL_VALUE ? '' : v }))}>
                 <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas</SelectItem>
+                  <SelectItem value={ALL_VALUE}>Todas</SelectItem>
                   {agencias.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Tipo (opcional)</Label>
-              <Select value={pdfFilters.tipo} onValueChange={v => setPdfFilters(prev => ({ ...prev, tipo: v }))}>
+              <Select value={pdfFilters.tipo || ALL_VALUE} onValueChange={v => setPdfFilters(prev => ({ ...prev, tipo: v === ALL_VALUE ? '' : v }))}>
                 <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value={ALL_VALUE}>Todos</SelectItem>
                   {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Cidade (opcional)</Label>
-              <Select value={pdfFilters.cidade} onValueChange={v => setPdfFilters(prev => ({ ...prev, cidade: v }))}>
+              <Select value={pdfFilters.cidade || ALL_VALUE} onValueChange={v => setPdfFilters(prev => ({ ...prev, cidade: v === ALL_VALUE ? '' : v }))}>
                 <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas</SelectItem>
+                  <SelectItem value={ALL_VALUE}>Todas</SelectItem>
                   {CIDADES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
