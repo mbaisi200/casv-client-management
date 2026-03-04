@@ -58,7 +58,12 @@ import {
   History,
   FileText,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  TrendingUp,
+  Users,
+  Calendar,
+  Building,
+  PieChart
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
@@ -102,6 +107,14 @@ export function Dashboard() {
     situacao: '',
     dateStart: '',
     dateEnd: ''
+  });
+
+  // BI Filter state
+  const [biFilters, setBiFilters] = useState({
+    dateStart: '',
+    dateEnd: '',
+    agencia: '',
+    tipo: ''
   });
 
   // Sort state
@@ -241,7 +254,7 @@ export function Dashboard() {
     const currentYear = hoje.getFullYear();
     const hasActiveFilters = Object.values(filters).some(v => v);
 
-    return clientes.filter(c => {
+    let result = clientes.filter(c => {
       if (c.deleted) return false;
 
       const situacaoStr = (c.situacao || '').trim();
@@ -281,10 +294,146 @@ export function Dashboard() {
 
       return true;
     });
+
+    // Apply sorting
+    if (sort.field) {
+      result.sort((a, b) => {
+        let aVal: any, bVal: any;
+        
+        switch (sort.field) {
+          case 'nome':
+            aVal = a.nome.toLowerCase();
+            bVal = b.nome.toLowerCase();
+            break;
+          case 'agencia':
+            aVal = a.agencia.toLowerCase();
+            bVal = b.agencia.toLowerCase();
+            break;
+          case 'tipo':
+            aVal = a.tipo;
+            bVal = b.tipo;
+            break;
+          case 'cidade':
+            aVal = a.cidade.toLowerCase();
+            bVal = b.cidade.toLowerCase();
+            break;
+          case 'dataInclusao':
+            aVal = a.dataInclusao ? new Date(a.dataInclusao).getTime() : 0;
+            bVal = b.dataInclusao ? new Date(b.dataInclusao).getTime() : 0;
+            break;
+          case 'casv':
+            aVal = a.casv ? new Date(a.casv).getTime() : 0;
+            bVal = b.casv ? new Date(b.casv).getTime() : 0;
+            break;
+          case 'consulado':
+            aVal = a.consulado ? new Date(a.consulado).getTime() : 0;
+            bVal = b.consulado ? new Date(b.consulado).getTime() : 0;
+            break;
+          case 'situacao':
+            aVal = a.situacao.toLowerCase();
+            bVal = b.situacao.toLowerCase();
+            break;
+          default:
+            return 0;
+        }
+
+        if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
   };
 
   const filteredClientes = getFilteredClients();
   const agencias = [...new Set(clientes.filter(c => !c.deleted).map(c => c.agencia))].sort();
+
+  // BI Statistics with filters
+  const getBIStats = () => {
+    const filtered = clientes.filter(c => {
+      if (c.deleted) return false;
+      if (biFilters.tipo && c.tipo !== biFilters.tipo) return false;
+      if (biFilters.agencia && c.agencia !== biFilters.agencia) return false;
+      if (biFilters.dateStart && c.dataInclusao && c.dataInclusao < biFilters.dateStart) return false;
+      if (biFilters.dateEnd && c.dataInclusao && c.dataInclusao > biFilters.dateEnd) return false;
+      return true;
+    });
+
+    const stats: Record<string, number> = {
+      'Aguardando': 0,
+      'Aprovado': 0,
+      'Reprovado': 0,
+      'CASV': 0,
+      'Aprovado só CASV': 0,
+      'Consulado': 0,
+      'Não definido': 0
+    };
+
+    const vistos = filtered.filter(c => c.tipo === 'Visto');
+    const passaportes = filtered.filter(c => c.tipo === 'Passaporte');
+
+    vistos.forEach(c => {
+      const s = c.situacao || 'Não definido';
+      if (stats[s] !== undefined) stats[s]++;
+      else stats['Não definido']++;
+    });
+
+    // Stats by agency
+    const byAgency: Record<string, { vistos: number; passaportes: number; situacoes: Record<string, number> }> = {};
+    filtered.forEach(c => {
+      const ag = c.agencia || 'NÃO DEFINIDA';
+      if (!byAgency[ag]) {
+        byAgency[ag] = { vistos: 0, passaportes: 0, situacoes: {} };
+      }
+      if (c.tipo === 'Visto') {
+        byAgency[ag].vistos++;
+        const s = c.situacao || 'Não definido';
+        byAgency[ag].situacoes[s] = (byAgency[ag].situacoes[s] || 0) + 1;
+      } else {
+        byAgency[ag].passaportes++;
+      }
+    });
+
+    // Stats by city
+    const byCity: Record<string, { total: number; situacoes: Record<string, number> }> = {};
+    filtered.filter(c => c.tipo === 'Visto').forEach(c => {
+      const city = c.cidade || 'Não definida';
+      if (!byCity[city]) {
+        byCity[city] = { total: 0, situacoes: {} };
+      }
+      byCity[city].total++;
+      const s = c.situacao || 'Não definido';
+      byCity[city].situacoes[s] = (byCity[city].situacoes[s] || 0) + 1;
+    });
+
+    // Stats by month
+    const byMonth: Record<string, { total: number; aprovados: number }> = {};
+    filtered.forEach(c => {
+      if (c.dataInclusao) {
+        const month = c.dataInclusao.substring(0, 7); // YYYY-MM
+        if (!byMonth[month]) {
+          byMonth[month] = { total: 0, aprovados: 0 };
+        }
+        byMonth[month].total++;
+        if (c.situacao === 'Aprovado' || c.situacao === 'Aprovado só CASV') {
+          byMonth[month].aprovados++;
+        }
+      }
+    });
+
+    return {
+      stats,
+      vistos: vistos.length,
+      passaportes: passaportes.length,
+      total: filtered.length,
+      byAgency,
+      byCity,
+      byMonth
+    };
+  };
+
+  const biStats = getBIStats();
 
   // CRUD operations
   const handleAddUpdate = async () => {
@@ -427,7 +576,6 @@ export function Dashboard() {
     const c = clientes.find(x => x.id === id);
     if (!c) return;
 
-    // Handle special values
     if (value === NONE_VALUE) value = '';
     if (value === ALL_VALUE) return;
     
@@ -499,6 +647,11 @@ export function Dashboard() {
     } else {
       setSort({ field, direction: 'asc' });
     }
+  };
+
+  const getSortIndicator = (field: string) => {
+    if (sort.field !== field) return '↕';
+    return sort.direction === 'asc' ? '↑' : '↓';
   };
 
   // Export functions
@@ -622,28 +775,7 @@ export function Dashboard() {
     toast({ title: 'Sucesso', description: `PDF gerado com ${total} registros!` });
   };
 
-  // Stats for reports
-  const getStats = () => {
-    const stats: Record<string, number> = {
-      'Aguardando': 0,
-      'Aprovado': 0,
-      'Reprovado': 0,
-      'CASV': 0,
-      'Aprovado só CASV': 0,
-      'Consulado': 0,
-      'Não definido': 0
-    };
-
-    clientes.filter(c => !c.deleted && c.tipo === 'Visto').forEach(c => {
-      const s = c.situacao || 'Não definido';
-      if (stats[s] !== undefined) stats[s]++;
-      else stats['Não definido']++;
-    });
-
-    return stats;
-  };
-
-  const stats = getStats();
+  const stats = biStats.stats;
   const hiddenCount = clientes.filter(c => c.deleted).length;
 
   // Helper for filter selects
@@ -747,7 +879,8 @@ export function Dashboard() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="list">📋 Lista de Clientes</TabsTrigger>
-            <TabsTrigger value="reports">📊 Relatórios</TabsTrigger>
+            <TabsTrigger value="bi">📊 BI / Dashboard</TabsTrigger>
+            <TabsTrigger value="reports">📄 Relatórios</TabsTrigger>
           </TabsList>
 
           <TabsContent value="list" className="space-y-6">
@@ -952,20 +1085,30 @@ export function Dashboard() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="cursor-pointer hover:bg-slate-100" onClick={() => handleSort('nome')}>
-                          Nome {sort.field === 'nome' && (sort.direction === 'asc' ? '↑' : '↓')}
+                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('nome')}>
+                          Nome {getSortIndicator('nome')}
                         </TableHead>
-                        <TableHead className="cursor-pointer hover:bg-slate-100" onClick={() => handleSort('agencia')}>
-                          Agência {sort.field === 'agencia' && (sort.direction === 'asc' ? '↑' : '↓')}
+                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('agencia')}>
+                          Agência {getSortIndicator('agencia')}
                         </TableHead>
-                        <TableHead className="cursor-pointer hover:bg-slate-100" onClick={() => handleSort('tipo')}>
-                          Tipo {sort.field === 'tipo' && (sort.direction === 'asc' ? '↑' : '↓')}
+                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('tipo')}>
+                          Tipo {getSortIndicator('tipo')}
                         </TableHead>
-                        <TableHead>Cidade</TableHead>
-                        <TableHead>Data Inclusão</TableHead>
-                        <TableHead>Data CASV</TableHead>
-                        <TableHead>Data Consulado</TableHead>
-                        <TableHead>Situação</TableHead>
+                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('cidade')}>
+                          Cidade {getSortIndicator('cidade')}
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('dataInclusao')}>
+                          Data Inclusão {getSortIndicator('dataInclusao')}
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('casv')}>
+                          Data CASV {getSortIndicator('casv')}
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('consulado')}>
+                          Data Consulado {getSortIndicator('consulado')}
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('situacao')}>
+                          Situação {getSortIndicator('situacao')}
+                        </TableHead>
                         <TableHead>Ações</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1090,52 +1233,134 @@ export function Dashboard() {
             </div>
           </TabsContent>
 
-          <TabsContent value="reports" className="space-y-6">
+          {/* BI Tab */}
+          <TabsContent value="bi" className="space-y-6">
+            {/* BI Filters */}
             <Card>
               <CardHeader>
-                <CardTitle>📈 Estatísticas Gerais</CardTitle>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <PieChart className="w-5 h-5" /> Filtros do BI
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {Object.entries(stats).map(([key, value]) => {
-                    const colors: Record<string, string> = {
-                      'Aguardando': 'bg-purple-100 text-purple-800 border-purple-300',
-                      'Aprovado': 'bg-green-100 text-green-800 border-green-300',
-                      'Reprovado': 'bg-red-100 text-red-800 border-red-300',
-                      'CASV': 'bg-blue-100 text-blue-800 border-blue-300',
-                      'Aprovado só CASV': 'bg-emerald-100 text-emerald-800 border-emerald-300',
-                      'Consulado': 'bg-violet-100 text-violet-800 border-violet-300',
-                      'Não definido': 'bg-gray-100 text-gray-800 border-gray-300'
-                    };
-                    return (
-                      <Badge key={key} variant="outline" className={colors[key]}>
-                        {key}: {value}
-                      </Badge>
-                    );
-                  })}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <Label>Data Inclusão (Início)</Label>
+                    <Input 
+                      type="date" 
+                      value={biFilters.dateStart} 
+                      onChange={e => setBiFilters(prev => ({ ...prev, dateStart: e.target.value }))} 
+                    />
+                  </div>
+                  <div>
+                    <Label>Data Inclusão (Fim)</Label>
+                    <Input 
+                      type="date" 
+                      value={biFilters.dateEnd} 
+                      onChange={e => setBiFilters(prev => ({ ...prev, dateEnd: e.target.value }))} 
+                    />
+                  </div>
+                  <div>
+                    <Label>Agência</Label>
+                    <Select value={biFilters.agencia || ALL_VALUE} onValueChange={v => setBiFilters(prev => ({ ...prev, agencia: v === ALL_VALUE ? '' : v }))}>
+                      <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ALL_VALUE}>Todas</SelectItem>
+                        {agencias.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Tipo</Label>
+                    <Select value={biFilters.tipo || ALL_VALUE} onValueChange={v => setBiFilters(prev => ({ ...prev, tipo: v === ALL_VALUE ? '' : v }))}>
+                      <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ALL_VALUE}>Todos</SelectItem>
+                        {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {Object.entries(stats).filter(([_, v]) => v > 0).map(([key, value]) => {
-                    const total = Object.values(stats).reduce((a, b) => a + b, 0);
-                    const pct = total ? ((value / total) * 100).toFixed(1) : '0';
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-blue-100 text-sm">Total de Clientes</p>
+                      <p className="text-3xl font-bold">{biStats.total}</p>
+                    </div>
+                    <Users className="w-10 h-10 text-blue-200" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-green-100 text-sm">Vistos</p>
+                      <p className="text-3xl font-bold">{biStats.vistos}</p>
+                    </div>
+                    <TrendingUp className="w-10 h-10 text-green-200" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-gradient-to-br from-amber-500 to-amber-600 text-white">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-amber-100 text-sm">Passaportes</p>
+                      <p className="text-3xl font-bold">{biStats.passaportes}</p>
+                    </div>
+                    <Calendar className="w-10 h-10 text-amber-200" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-emerald-100 text-sm">Aprovados</p>
+                      <p className="text-3xl font-bold">{stats['Aprovado'] + stats['Aprovado só CASV']}</p>
+                    </div>
+                    <TrendingUp className="w-10 h-10 text-emerald-200" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Status by Situation */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">📊 Distribuição por Situação</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                  {Object.entries(stats).map(([key, value]) => {
+                    const total = biStats.vistos || 1;
+                    const pct = ((value / total) * 100).toFixed(1);
                     const bgColors: Record<string, string> = {
-                      'Aguardando': 'bg-purple-500',
-                      'Aprovado': 'bg-green-500',
-                      'Reprovado': 'bg-red-500',
-                      'CASV': 'bg-blue-500',
-                      'Aprovado só CASV': 'bg-emerald-500',
-                      'Consulado': 'bg-violet-500',
-                      'Não definido': 'bg-gray-400'
+                      'Aguardando': 'from-purple-500 to-purple-600',
+                      'Aprovado': 'from-green-500 to-green-600',
+                      'Reprovado': 'from-red-500 to-red-600',
+                      'CASV': 'from-blue-500 to-blue-600',
+                      'Aprovado só CASV': 'from-emerald-500 to-emerald-600',
+                      'Consulado': 'from-violet-500 to-violet-600',
+                      'Não definido': 'from-gray-400 to-gray-500'
                     };
                     return (
-                      <Card key={key} className="p-4">
-                        <div className="text-sm text-slate-600">{key}</div>
-                        <div className="text-2xl font-bold">{value}</div>
-                        <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
-                          <div className={`h-2 rounded-full ${bgColors[key]}`} style={{ width: `${pct}%` }} />
-                        </div>
-                        <div className="text-xs text-slate-500 mt-1">{pct}%</div>
+                      <Card key={key} className={`bg-gradient-to-br ${bgColors[key]} text-white`}>
+                        <CardContent className="pt-4 pb-4">
+                          <p className="text-xs opacity-80 truncate">{key}</p>
+                          <p className="text-2xl font-bold">{value}</p>
+                          <div className="w-full bg-white/30 rounded-full h-1.5 mt-2">
+                            <div className="bg-white h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                          </div>
+                          <p className="text-xs opacity-80 mt-1">{pct}%</p>
+                        </CardContent>
                       </Card>
                     );
                   })}
@@ -1143,26 +1368,104 @@ export function Dashboard() {
               </CardContent>
             </Card>
 
+            {/* By Agency */}
             <Card>
               <CardHeader>
-                <CardTitle>🏢 Por Agência</CardTitle>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Building className="w-5 h-5" /> Por Agência
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Agência</TableHead>
+                        <TableHead className="text-center">Vistos</TableHead>
+                        <TableHead className="text-center">Passaportes</TableHead>
+                        <TableHead className="text-center">Total</TableHead>
+                        <TableHead className="text-center">Aprovados</TableHead>
+                        <TableHead className="text-center">Reprovados</TableHead>
+                        <TableHead className="text-center">Pendentes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {Object.entries(biStats.byAgency).sort(([,a], [,b]) => (b.vistos + b.passaportes) - (a.vistos + a.passaportes)).map(([agencia, data]) => (
+                        <TableRow key={agencia}>
+                          <TableCell className="font-medium">{agencia}</TableCell>
+                          <TableCell className="text-center"><Badge className="bg-blue-100 text-blue-800">{data.vistos}</Badge></TableCell>
+                          <TableCell className="text-center"><Badge className="bg-amber-100 text-amber-800">{data.passaportes}</Badge></TableCell>
+                          <TableCell className="text-center font-bold">{data.vistos + data.passaportes}</TableCell>
+                          <TableCell className="text-center"><Badge className="bg-green-100 text-green-800">{(data.situacoes['Aprovado'] || 0) + (data.situacoes['Aprovado só CASV'] || 0)}</Badge></TableCell>
+                          <TableCell className="text-center"><Badge className="bg-red-100 text-red-800">{data.situacoes['Reprovado'] || 0}</Badge></TableCell>
+                          <TableCell className="text-center"><Badge className="bg-purple-100 text-purple-800">{(data.situacoes['Aguardando'] || 0) + (data.situacoes['CASV'] || 0) + (data.situacoes['Consulado'] || 0)}</Badge></TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* By City */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Calendar className="w-5 h-5" /> Por Cidade (Vistos)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                  {Object.entries(biStats.byCity).sort(([,a], [,b]) => b.total - a.total).map(([city, data]) => (
+                    <Card key={city} className="border">
+                      <CardContent className="pt-4">
+                        <p className="font-semibold truncate">{city}</p>
+                        <p className="text-2xl font-bold text-blue-600">{data.total}</p>
+                        <div className="text-xs text-slate-600 mt-2 space-y-1">
+                          {Object.entries(data.situacoes).slice(0, 3).map(([s, count]) => (
+                            <div key={s} className="flex justify-between">
+                              <span>{s}:</span>
+                              <span className="font-medium">{count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Timeline by Month */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">📈 Evolução Mensal</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {Array.from(new Set(clientes.filter(c => !c.deleted).map(c => c.agencia))).sort().map(agencia => {
-                    const agencyClients = clientes.filter(c => !c.deleted && c.agencia === agencia);
-                    const vistos = agencyClients.filter(c => c.tipo === 'Visto');
-                    const passaportes = agencyClients.filter(c => c.tipo === 'Passaporte');
+                  {Object.entries(biStats.byMonth).sort(([a], [b]) => b.localeCompare(a)).slice(0, 12).map(([month, data]) => {
+                    const [year, m] = month.split('-');
+                    const monthName = new Date(parseInt(year), parseInt(m) - 1).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+                    const maxTotal = Math.max(...Object.values(biStats.byMonth).map(d => d.total), 1);
+                    const barWidth = (data.total / maxTotal) * 100;
+                    const approvalRate = data.total > 0 ? ((data.aprovados / data.total) * 100).toFixed(0) : 0;
                     
                     return (
-                      <div key={agencia} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold">{agencia}</h4>
-                          <Badge>{agencyClients.length} clientes</Badge>
+                      <div key={month} className="flex items-center gap-4">
+                        <div className="w-28 text-sm font-medium capitalize">{monthName}</div>
+                        <div className="flex-1">
+                          <div className="h-6 bg-slate-100 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-end pr-2"
+                              style={{ width: `${barWidth}%` }}
+                            >
+                              <span className="text-xs text-white font-bold">{data.total}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex gap-4 text-sm">
-                          <span className="text-blue-600">Vistos: {vistos.length}</span>
-                          <span className="text-amber-600">Passaportes: {passaportes.length}</span>
+                        <div className="w-20 text-sm text-right">
+                          <span className="text-green-600 font-medium">{approvalRate}%</span>
+                          <span className="text-slate-400 text-xs"> apr.</span>
                         </div>
                       </div>
                     );
@@ -1170,12 +1473,43 @@ export function Dashboard() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
 
-            <div className="flex justify-center">
-              <Button onClick={() => exportCSV(clientes.filter(c => !c.deleted), 'relatorio_completo.csv')}>
-                <Download className="w-4 h-4 mr-1" /> Exportar Relatório Completo (CSV)
-              </Button>
-            </div>
+          {/* Reports Tab */}
+          <TabsContent value="reports" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>📄 Gerar Relatórios</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Card className="border-2 border-dashed">
+                    <CardContent className="pt-6">
+                      <div className="text-center">
+                        <FileText className="w-12 h-12 mx-auto text-blue-500 mb-4" />
+                        <h3 className="font-semibold text-lg">Relatório PDF</h3>
+                        <p className="text-slate-600 text-sm mt-2">Gere um relatório completo em PDF com filtros por data, agência e tipo.</p>
+                        <Button className="mt-4" onClick={() => setPdfDialog(true)}>
+                          Gerar PDF
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-2 border-dashed">
+                    <CardContent className="pt-6">
+                      <div className="text-center">
+                        <Download className="w-12 h-12 mx-auto text-green-500 mb-4" />
+                        <h3 className="font-semibold text-lg">Exportar CSV</h3>
+                        <p className="text-slate-600 text-sm mt-2">Exporte todos os dados filtrados para uma planilha CSV.</p>
+                        <Button className="mt-4" variant="outline" onClick={() => exportCSV(clientes.filter(c => !c.deleted), 'relatorio_completo.csv')}>
+                          Exportar CSV
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
