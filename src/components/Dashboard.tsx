@@ -1600,56 +1600,56 @@ export function Dashboard() {
 
       {/* BI Detail Modal */}
       <Dialog open={biDetailModal.open} onOpenChange={v => setBiDetailModal(prev => ({ ...prev, open: v }))}>
-        <DialogContent className="max-w-4xl max-h-[85vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <PieChart className="w-5 h-5" /> {biDetailModal.title}
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[90vh] p-0">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b">
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <PieChart className="w-6 h-6 text-blue-600" /> {biDetailModal.title}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-base">
               {biDetailModal.clientes.length} cliente(s) encontrado(s)
             </DialogDescription>
           </DialogHeader>
-          <div className="overflow-auto max-h-[60vh]">
-            <Table>
+          <div className="overflow-auto max-h-[calc(90vh-180px)] px-6 py-4">
+            <Table className="w-full table-fixed">
               <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Agência</TableHead>
-                  <TableHead>Cidade</TableHead>
-                  <TableHead>Data Inclusão</TableHead>
-                  <TableHead>CASV</TableHead>
-                  <TableHead>Consulado</TableHead>
-                  <TableHead>Situação</TableHead>
+                <TableRow className="bg-slate-100">
+                  <TableHead className="w-[20%] font-semibold">Nome</TableHead>
+                  <TableHead className="w-[15%] font-semibold">Agência</TableHead>
+                  <TableHead className="w-[10%] font-semibold text-center">Cidade</TableHead>
+                  <TableHead className="w-[10%] font-semibold text-center">Inclusão</TableHead>
+                  <TableHead className="w-[10%] font-semibold text-center">CASV</TableHead>
+                  <TableHead className="w-[10%] font-semibold text-center">Consulado</TableHead>
+                  <TableHead className="w-[15%] font-semibold text-center">Situação</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {biDetailModal.clientes.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                    <TableCell colSpan={7} className="text-center py-12 text-slate-500 text-lg">
                       Nenhum cliente encontrado
                     </TableCell>
                   </TableRow>
                 ) : (
                   biDetailModal.clientes.map(c => (
-                    <TableRow key={c.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => {
+                    <TableRow key={c.id} className="hover:bg-blue-50 cursor-pointer transition-colors" onClick={() => {
                       setBiDetailModal(prev => ({ ...prev, open: false }));
                       prepareEdit(c);
                       setActiveTab('list');
                     }}>
-                      <TableCell className="font-medium">{c.nome}</TableCell>
-                      <TableCell>{c.agencia}</TableCell>
-                      <TableCell>{c.cidade || '-'}</TableCell>
-                      <TableCell>{formatDate(c.dataInclusao)}</TableCell>
-                      <TableCell>{formatDate(c.casv)}</TableCell>
-                      <TableCell>{formatDate(c.consulado)}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium truncate" title={c.nome}>{c.nome}</TableCell>
+                      <TableCell className="truncate" title={c.agencia}>{c.agencia}</TableCell>
+                      <TableCell className="text-center truncate">{c.cidade || '-'}</TableCell>
+                      <TableCell className="text-center whitespace-nowrap">{formatDate(c.dataInclusao)}</TableCell>
+                      <TableCell className="text-center whitespace-nowrap">{formatDate(c.casv)}</TableCell>
+                      <TableCell className="text-center whitespace-nowrap">{formatDate(c.consulado)}</TableCell>
+                      <TableCell className="text-center">
                         <Badge variant="outline" className={
-                          c.situacao === 'Aprovado' ? 'bg-green-100 text-green-800' :
-                          c.situacao === 'Reprovado' ? 'bg-red-100 text-red-800' :
-                          c.situacao === 'CASV' ? 'bg-blue-100 text-blue-800' :
-                          c.situacao === 'Aprovado só CASV' ? 'bg-emerald-100 text-emerald-800' :
-                          c.situacao === 'Consulado' ? 'bg-violet-100 text-violet-800' :
-                          'bg-gray-100 text-gray-800'
+                          c.situacao === 'Aprovado' ? 'bg-green-100 text-green-800 border-green-300' :
+                          c.situacao === 'Reprovado' ? 'bg-red-100 text-red-800 border-red-300' :
+                          c.situacao === 'CASV' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                          c.situacao === 'Aprovado só CASV' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                          c.situacao === 'Consulado' ? 'bg-violet-100 text-violet-800 border-violet-300' :
+                          'bg-gray-100 text-gray-800 border-gray-300'
                         }>
                           {c.situacao || 'Não definido'}
                         </Badge>
@@ -1660,14 +1660,14 @@ export function Dashboard() {
               </TableBody>
             </Table>
           </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setBiDetailModal(prev => ({ ...prev, open: false }))}>
+          <DialogFooter className="px-6 py-4 border-t bg-slate-50 gap-3">
+            <Button variant="outline" size="lg" onClick={() => setBiDetailModal(prev => ({ ...prev, open: false }))}>
               Fechar
             </Button>
-            <Button onClick={() => {
+            <Button size="lg" onClick={() => {
               exportCSV(biDetailModal.clientes, `relatorio_${biDetailModal.filterType}_${biDetailModal.filterValue || 'todos'}.csv`);
             }}>
-              <Download className="w-4 h-4 mr-1" /> Exportar CSV
+              <Download className="w-5 h-5 mr-2" /> Exportar CSV
             </Button>
           </DialogFooter>
         </DialogContent>
