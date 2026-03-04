@@ -138,6 +138,15 @@ export function Dashboard() {
     tipo: '',
     cidade: ''
   });
+  
+  // BI Detail Modal
+  const [biDetailModal, setBiDetailModal] = useState<{
+    open: boolean;
+    title: string;
+    clientes: Cliente[];
+    filterType: string;
+    filterValue: string;
+  }>({ open: false, title: '', clientes: [], filterType: '', filterValue: '' });
 
   // Helper functions
   const getLocalDateString = () => {
@@ -787,6 +796,42 @@ export function Dashboard() {
     }
   };
 
+  // Helper for BI detail modal
+  const openBIDetail = (filterType: string, filterValue: string, title: string) => {
+    const filtered = clientes.filter(c => {
+      if (c.deleted) return false;
+      if (biFilters.tipo && c.tipo !== biFilters.tipo) return false;
+      if (biFilters.agencia && c.agencia !== biFilters.agencia) return false;
+      if (biFilters.dateStart && c.dataInclusao && c.dataInclusao < biFilters.dateStart) return false;
+      if (biFilters.dateEnd && c.dataInclusao && c.dataInclusao > biFilters.dateEnd) return false;
+      
+      switch (filterType) {
+        case 'situacao':
+          return c.tipo === 'Visto' && (c.situacao || 'Não definido') === filterValue;
+        case 'tipo':
+          return c.tipo === filterValue;
+        case 'agencia':
+          return c.agencia === filterValue;
+        case 'cidade':
+          return c.cidade === filterValue;
+        case 'total':
+          return true;
+        case 'aprovados':
+          return c.situacao === 'Aprovado' || c.situacao === 'Aprovado só CASV';
+        default:
+          return true;
+      }
+    });
+    
+    setBiDetailModal({
+      open: true,
+      title,
+      clientes: filtered,
+      filterType,
+      filterValue
+    });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -1285,48 +1330,60 @@ export function Dashboard() {
             </Card>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-                <CardContent className="pt-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Card 
+                className="bg-gradient-to-br from-blue-500 to-blue-600 text-white cursor-pointer hover:scale-[1.02] transition-transform shadow-lg"
+                onClick={() => openBIDetail('total', '', 'Todos os Clientes')}
+              >
+                <CardContent className="pt-4 pb-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-blue-100 text-sm">Total de Clientes</p>
-                      <p className="text-3xl font-bold">{biStats.total}</p>
+                      <p className="text-blue-100 text-xs">Total de Clientes</p>
+                      <p className="text-2xl font-bold">{biStats.total}</p>
                     </div>
-                    <Users className="w-10 h-10 text-blue-200" />
+                    <Users className="w-8 h-8 text-blue-200" />
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
-                <CardContent className="pt-6">
+              <Card 
+                className="bg-gradient-to-br from-green-500 to-green-600 text-white cursor-pointer hover:scale-[1.02] transition-transform shadow-lg"
+                onClick={() => openBIDetail('tipo', 'Visto', 'Clientes Visto')}
+              >
+                <CardContent className="pt-4 pb-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-green-100 text-sm">Vistos</p>
-                      <p className="text-3xl font-bold">{biStats.vistos}</p>
+                      <p className="text-green-100 text-xs">Vistos</p>
+                      <p className="text-2xl font-bold">{biStats.vistos}</p>
                     </div>
-                    <TrendingUp className="w-10 h-10 text-green-200" />
+                    <TrendingUp className="w-8 h-8 text-green-200" />
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-gradient-to-br from-amber-500 to-amber-600 text-white">
-                <CardContent className="pt-6">
+              <Card 
+                className="bg-gradient-to-br from-amber-500 to-amber-600 text-white cursor-pointer hover:scale-[1.02] transition-transform shadow-lg"
+                onClick={() => openBIDetail('tipo', 'Passaporte', 'Clientes Passaporte')}
+              >
+                <CardContent className="pt-4 pb-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-amber-100 text-sm">Passaportes</p>
-                      <p className="text-3xl font-bold">{biStats.passaportes}</p>
+                      <p className="text-amber-100 text-xs">Passaportes</p>
+                      <p className="text-2xl font-bold">{biStats.passaportes}</p>
                     </div>
-                    <Calendar className="w-10 h-10 text-amber-200" />
+                    <Calendar className="w-8 h-8 text-amber-200" />
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
-                <CardContent className="pt-6">
+              <Card 
+                className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white cursor-pointer hover:scale-[1.02] transition-transform shadow-lg"
+                onClick={() => openBIDetail('aprovados', '', 'Clientes Aprovados')}
+              >
+                <CardContent className="pt-4 pb-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-emerald-100 text-sm">Aprovados</p>
-                      <p className="text-3xl font-bold">{stats['Aprovado'] + stats['Aprovado só CASV']}</p>
+                      <p className="text-emerald-100 text-xs">Aprovados</p>
+                      <p className="text-2xl font-bold">{stats['Aprovado'] + stats['Aprovado só CASV']}</p>
                     </div>
-                    <TrendingUp className="w-10 h-10 text-emerald-200" />
+                    <TrendingUp className="w-8 h-8 text-emerald-200" />
                   </div>
                 </CardContent>
               </Card>
@@ -1334,14 +1391,14 @@ export function Dashboard() {
 
             {/* Status by Situation */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">📊 Distribuição por Situação</CardTitle>
+              <CardHeader className="py-3">
+                <CardTitle className="text-base">📊 Distribuição por Situação (Clique para detalhes)</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+              <CardContent className="pt-0">
+                <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
                   {Object.entries(stats).map(([key, value]) => {
                     const total = biStats.vistos || 1;
-                    const pct = ((value / total) * 100).toFixed(1);
+                    const pct = ((value / total) * 100).toFixed(0);
                     const bgColors: Record<string, string> = {
                       'Aguardando': 'from-purple-500 to-purple-600',
                       'Aprovado': 'from-green-500 to-green-600',
@@ -1352,14 +1409,17 @@ export function Dashboard() {
                       'Não definido': 'from-gray-400 to-gray-500'
                     };
                     return (
-                      <Card key={key} className={`bg-gradient-to-br ${bgColors[key]} text-white`}>
-                        <CardContent className="pt-4 pb-4">
-                          <p className="text-xs opacity-80 truncate">{key}</p>
-                          <p className="text-2xl font-bold">{value}</p>
-                          <div className="w-full bg-white/30 rounded-full h-1.5 mt-2">
-                            <div className="bg-white h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                      <Card 
+                        key={key} 
+                        className={`bg-gradient-to-br ${bgColors[key]} text-white cursor-pointer hover:scale-[1.03] transition-transform shadow-md`}
+                        onClick={() => openBIDetail('situacao', key, `Situação: ${key}`)}
+                      >
+                        <CardContent className="pt-3 pb-3 px-3">
+                          <p className="text-[10px] opacity-90 truncate">{key}</p>
+                          <div className="flex items-end justify-between mt-1">
+                            <p className="text-xl font-bold">{value}</p>
+                            <p className="text-xs opacity-80">{pct}%</p>
                           </div>
-                          <p className="text-xs opacity-80 mt-1">{pct}%</p>
                         </CardContent>
                       </Card>
                     );
@@ -1535,6 +1595,81 @@ export function Dashboard() {
               <p className="text-slate-500">Sem histórico.</p>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* BI Detail Modal */}
+      <Dialog open={biDetailModal.open} onOpenChange={v => setBiDetailModal(prev => ({ ...prev, open: v }))}>
+        <DialogContent className="max-w-4xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PieChart className="w-5 h-5" /> {biDetailModal.title}
+            </DialogTitle>
+            <DialogDescription>
+              {biDetailModal.clientes.length} cliente(s) encontrado(s)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-auto max-h-[60vh]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Agência</TableHead>
+                  <TableHead>Cidade</TableHead>
+                  <TableHead>Data Inclusão</TableHead>
+                  <TableHead>CASV</TableHead>
+                  <TableHead>Consulado</TableHead>
+                  <TableHead>Situação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {biDetailModal.clientes.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                      Nenhum cliente encontrado
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  biDetailModal.clientes.map(c => (
+                    <TableRow key={c.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => {
+                      setBiDetailModal(prev => ({ ...prev, open: false }));
+                      prepareEdit(c);
+                      setActiveTab('list');
+                    }}>
+                      <TableCell className="font-medium">{c.nome}</TableCell>
+                      <TableCell>{c.agencia}</TableCell>
+                      <TableCell>{c.cidade || '-'}</TableCell>
+                      <TableCell>{formatDate(c.dataInclusao)}</TableCell>
+                      <TableCell>{formatDate(c.casv)}</TableCell>
+                      <TableCell>{formatDate(c.consulado)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={
+                          c.situacao === 'Aprovado' ? 'bg-green-100 text-green-800' :
+                          c.situacao === 'Reprovado' ? 'bg-red-100 text-red-800' :
+                          c.situacao === 'CASV' ? 'bg-blue-100 text-blue-800' :
+                          c.situacao === 'Aprovado só CASV' ? 'bg-emerald-100 text-emerald-800' :
+                          c.situacao === 'Consulado' ? 'bg-violet-100 text-violet-800' :
+                          'bg-gray-100 text-gray-800'
+                        }>
+                          {c.situacao || 'Não definido'}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setBiDetailModal(prev => ({ ...prev, open: false }))}>
+              Fechar
+            </Button>
+            <Button onClick={() => {
+              exportCSV(biDetailModal.clientes, `relatorio_${biDetailModal.filterType}_${biDetailModal.filterValue || 'todos'}.csv`);
+            }}>
+              <Download className="w-4 h-4 mr-1" /> Exportar CSV
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
