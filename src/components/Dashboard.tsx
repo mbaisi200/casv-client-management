@@ -686,6 +686,228 @@ export function Dashboard() {
     link.click();
   };
 
+  // Export BI Detail to PDF
+  const exportBIDetailPDF = (data: Cliente[], title: string, filterType: string, filterValue: string) => {
+    if (data.length === 0) {
+      toast({ title: 'Aviso', description: 'Nenhum dado para exportar!' });
+      return;
+    }
+
+    const doc = new jsPDF('l', 'mm', 'a4'); // Landscape orientation for more horizontal space
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    let yPos = 20;
+
+    // Title
+    doc.setFontSize(18);
+    doc.text(title.toUpperCase(), pageWidth / 2, yPos, { align: 'center' });
+    yPos += 8;
+
+    // Subtitle with filter info
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    const today = new Date().toLocaleDateString('pt-BR');
+    doc.text(`Gerado em: ${today} | Filtro: ${filterType} = ${filterValue || 'Todos'} | Total: ${data.length} cliente(s)`, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 10;
+
+    // Reset text color
+    doc.setTextColor(0);
+
+    // Separate by type
+    const vistos = data.filter(c => c.tipo === 'Visto');
+    const passaportes = data.filter(c => c.tipo === 'Passaporte');
+
+    if (vistos.length > 0) {
+      doc.setFontSize(14);
+      doc.text('VISTOS', 15, yPos);
+      yPos += 8;
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Nome', 'Agência', 'Cidade', 'Data Inclusão', 'CASV', 'Consulado', 'Situação']],
+        body: vistos.map(c => [
+          c.nome,
+          c.agencia,
+          c.cidade || '-',
+          formatDate(c.dataInclusao),
+          formatDate(c.casv),
+          formatDate(c.consulado),
+          c.situacao || 'Não definido'
+        ]),
+        headStyles: { fillColor: [37, 99, 235], fontSize: 9 },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: {
+          0: { cellWidth: 50 },
+          1: { cellWidth: 35 },
+          2: { cellWidth: 30 },
+          3: { cellWidth: 30 },
+          4: { cellWidth: 30 },
+          5: { cellWidth: 30 },
+          6: { cellWidth: 35 }
+        }
+      });
+
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    if (passaportes.length > 0) {
+      if (yPos > pageHeight - 60) {
+        doc.addPage();
+        yPos = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.text('PASSAPORTES', 15, yPos);
+      yPos += 8;
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Nome', 'Agência', 'Cidade', 'Data Inclusão', 'Status']],
+        body: passaportes.map(c => [
+          c.nome,
+          c.agencia,
+          c.cidade || '-',
+          formatDate(c.dataInclusao),
+          'EM ANDAMENTO'
+        ]),
+        headStyles: { fillColor: [245, 158, 11], fontSize: 9 },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: {
+          0: { cellWidth: 60 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 40 },
+          3: { cellWidth: 40 },
+          4: { cellWidth: 40 }
+        }
+      });
+
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // Summary
+    if (yPos > pageHeight - 40) {
+      doc.addPage();
+      yPos = 20;
+    }
+
+    doc.setFontSize(12);
+    doc.text('RESUMO', 15, yPos);
+    yPos += 8;
+
+    const total = data.length;
+    autoTable(doc, {
+      startY: yPos,
+      body: [
+        ['Tipo', 'Quantidade', 'Percentual'],
+        ['Vistos', String(vistos.length), total ? ((vistos.length / total) * 100).toFixed(1) + '%' : '0%'],
+        ['Passaportes', String(passaportes.length), total ? ((passaportes.length / total) * 100).toFixed(1) + '%' : '0%'],
+        ['TOTAL', String(total), '100%']
+      ],
+      styles: { fontSize: 10, halign: 'center' },
+      headStyles: { fillColor: [100, 100, 100] }
+    });
+
+    // Save
+    const filename = `relatorio_${filterType}_${filterValue || 'todos'}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(filename);
+    toast({ title: 'Sucesso', description: `PDF gerado com ${total} registros!` });
+  };
+
+  // Export List to PDF
+  const exportListPDF = (data: Cliente[], filename: string) => {
+    if (data.length === 0) {
+      toast({ title: 'Aviso', description: 'Nenhum dado para exportar!' });
+      return;
+    }
+
+    const doc = new jsPDF('l', 'mm', 'a4'); // Landscape orientation
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let yPos = 20;
+
+    doc.setFontSize(18);
+    doc.text('LISTA DE CLIENTES CASV', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 8;
+
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    const today = new Date().toLocaleDateString('pt-BR');
+    doc.text(`Gerado em: ${today} | Total: ${data.length} cliente(s)`, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 10;
+    doc.setTextColor(0);
+
+    const vistos = data.filter(c => c.tipo === 'Visto');
+    const passaportes = data.filter(c => c.tipo === 'Passaporte');
+
+    if (vistos.length > 0) {
+      doc.setFontSize(14);
+      doc.text('VISTOS', 15, yPos);
+      yPos += 8;
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Nome', 'Agência', 'Cidade', 'Data Inclusão', 'CASV', 'Consulado', 'Situação']],
+        body: vistos.map(c => [
+          c.nome,
+          c.agencia,
+          c.cidade || '-',
+          formatDate(c.dataInclusao),
+          formatDate(c.casv),
+          formatDate(c.consulado),
+          c.situacao || 'Não definido'
+        ]),
+        headStyles: { fillColor: [37, 99, 235], fontSize: 9 },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: {
+          0: { cellWidth: 50 },
+          1: { cellWidth: 35 },
+          2: { cellWidth: 30 },
+          3: { cellWidth: 30 },
+          4: { cellWidth: 30 },
+          5: { cellWidth: 30 },
+          6: { cellWidth: 35 }
+        }
+      });
+
+      yPos = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    if (passaportes.length > 0) {
+      const pageHeight = doc.internal.pageSize.getHeight();
+      if (yPos > pageHeight - 60) {
+        doc.addPage();
+        yPos = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.text('PASSAPORTES', 15, yPos);
+      yPos += 8;
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Nome', 'Agência', 'Cidade', 'Data Inclusão', 'Status']],
+        body: passaportes.map(c => [
+          c.nome,
+          c.agencia,
+          c.cidade || '-',
+          formatDate(c.dataInclusao),
+          'EM ANDAMENTO'
+        ]),
+        headStyles: { fillColor: [245, 158, 11], fontSize: 9 },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: {
+          0: { cellWidth: 60 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 40 },
+          3: { cellWidth: 40 },
+          4: { cellWidth: 40 }
+        }
+      });
+    }
+
+    doc.save(filename);
+    toast({ title: 'Sucesso', description: `PDF gerado com ${data.length} registros!` });
+  };
+
   const generatePDFReport = async () => {
     if (!pdfFilters.dateStart || !pdfFilters.dateEnd) {
       toast({ title: 'Erro', description: 'Preencha as datas!', variant: 'destructive' });
@@ -1269,11 +1491,11 @@ export function Dashboard() {
 
             {/* Export buttons */}
             <div className="flex justify-center gap-4">
-              <Button variant="outline" onClick={() => exportCSV(filteredClientes, 'lista_clientes.csv')}>
-                <Download className="w-4 h-4 mr-1" /> Exportar CSV
+              <Button variant="outline" onClick={() => exportListPDF(filteredClientes, 'lista_clientes.pdf')}>
+                <FileText className="w-4 h-4 mr-1" /> Exportar PDF
               </Button>
               <Button variant="outline" onClick={() => setPdfDialog(true)}>
-                <FileText className="w-4 h-4 mr-1" /> Relatório PDF
+                <FileText className="w-4 h-4 mr-1" /> Relatório PDF Personalizado
               </Button>
             </div>
           </TabsContent>
@@ -1547,7 +1769,7 @@ export function Dashboard() {
                     <CardContent className="pt-6">
                       <div className="text-center">
                         <FileText className="w-12 h-12 mx-auto text-blue-500 mb-4" />
-                        <h3 className="font-semibold text-lg">Relatório PDF</h3>
+                        <h3 className="font-semibold text-lg">Relatório PDF Personalizado</h3>
                         <p className="text-slate-600 text-sm mt-2">Gere um relatório completo em PDF com filtros por data, agência e tipo.</p>
                         <Button className="mt-4" onClick={() => setPdfDialog(true)}>
                           Gerar PDF
@@ -1558,11 +1780,11 @@ export function Dashboard() {
                   <Card className="border-2 border-dashed">
                     <CardContent className="pt-6">
                       <div className="text-center">
-                        <Download className="w-12 h-12 mx-auto text-green-500 mb-4" />
-                        <h3 className="font-semibold text-lg">Exportar CSV</h3>
-                        <p className="text-slate-600 text-sm mt-2">Exporte todos os dados filtrados para uma planilha CSV.</p>
-                        <Button className="mt-4" variant="outline" onClick={() => exportCSV(clientes.filter(c => !c.deleted), 'relatorio_completo.csv')}>
-                          Exportar CSV
+                        <FileText className="w-12 h-12 mx-auto text-green-500 mb-4" />
+                        <h3 className="font-semibold text-lg">Exportar Completo para PDF</h3>
+                        <p className="text-slate-600 text-sm mt-2">Exporte todos os dados para um arquivo PDF em formato paisagem.</p>
+                        <Button className="mt-4" variant="outline" onClick={() => exportListPDF(clientes.filter(c => !c.deleted), 'relatorio_completo.pdf')}>
+                          Exportar PDF
                         </Button>
                       </div>
                     </CardContent>
@@ -1600,7 +1822,7 @@ export function Dashboard() {
 
       {/* BI Detail Modal */}
       <Dialog open={biDetailModal.open} onOpenChange={v => setBiDetailModal(prev => ({ ...prev, open: v }))}>
-        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[90vh] p-0">
+        <DialogContent className="max-w-[98vw] w-[98vw] max-h-[90vh] p-0">
           <DialogHeader className="px-6 pt-6 pb-3 border-b">
             <DialogTitle className="flex items-center gap-2 text-xl">
               <PieChart className="w-6 h-6 text-blue-600" /> {biDetailModal.title}
@@ -1613,13 +1835,13 @@ export function Dashboard() {
             <Table className="w-full table-fixed">
               <TableHeader>
                 <TableRow className="bg-slate-100">
-                  <TableHead className="w-[20%] font-semibold">Nome</TableHead>
-                  <TableHead className="w-[15%] font-semibold">Agência</TableHead>
-                  <TableHead className="w-[10%] font-semibold text-center">Cidade</TableHead>
-                  <TableHead className="w-[10%] font-semibold text-center">Inclusão</TableHead>
-                  <TableHead className="w-[10%] font-semibold text-center">CASV</TableHead>
-                  <TableHead className="w-[10%] font-semibold text-center">Consulado</TableHead>
-                  <TableHead className="w-[15%] font-semibold text-center">Situação</TableHead>
+                  <TableHead className="w-[18%] font-semibold">Nome</TableHead>
+                  <TableHead className="w-[14%] font-semibold">Agência</TableHead>
+                  <TableHead className="w-[12%] font-semibold text-center">Cidade</TableHead>
+                  <TableHead className="w-[12%] font-semibold text-center">Inclusão</TableHead>
+                  <TableHead className="w-[12%] font-semibold text-center">CASV</TableHead>
+                  <TableHead className="w-[12%] font-semibold text-center">Consulado</TableHead>
+                  <TableHead className="w-[20%] font-semibold text-center">Situação</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1665,9 +1887,9 @@ export function Dashboard() {
               Fechar
             </Button>
             <Button size="lg" onClick={() => {
-              exportCSV(biDetailModal.clientes, `relatorio_${biDetailModal.filterType}_${biDetailModal.filterValue || 'todos'}.csv`);
+              exportBIDetailPDF(biDetailModal.clientes, biDetailModal.title, biDetailModal.filterType, biDetailModal.filterValue);
             }}>
-              <Download className="w-5 h-5 mr-2" /> Exportar CSV
+              <FileText className="w-5 h-5 mr-2" /> Exportar PDF
             </Button>
           </DialogFooter>
         </DialogContent>
