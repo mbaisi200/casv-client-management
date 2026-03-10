@@ -1832,16 +1832,16 @@ export function Dashboard() {
             </DialogDescription>
           </DialogHeader>
           <div className="overflow-auto max-h-[calc(90vh-180px)] px-6 py-4">
-            <Table className="w-full table-fixed">
+            <Table className="w-full table-fixed min-w-[1120px]">
               <TableHeader>
                 <TableRow className="bg-slate-100">
-                  <TableHead className="w-[18%] font-semibold">Nome</TableHead>
-                  <TableHead className="w-[14%] font-semibold">Agência</TableHead>
-                  <TableHead className="w-[12%] font-semibold text-center">Cidade</TableHead>
-                  <TableHead className="w-[12%] font-semibold text-center">Inclusão</TableHead>
-                  <TableHead className="w-[12%] font-semibold text-center">CASV</TableHead>
-                  <TableHead className="w-[12%] font-semibold text-center">Consulado</TableHead>
-                  <TableHead className="w-[20%] font-semibold text-center">Situação</TableHead>
+                  <TableHead className="w-[250px] font-semibold">Nome</TableHead>
+                  <TableHead className="w-[180px] font-semibold">Agência</TableHead>
+                  <TableHead className="w-[150px] font-semibold text-center">Cidade</TableHead>
+                  <TableHead className="w-[120px] font-semibold text-center">Inclusão</TableHead>
+                  <TableHead className="w-[120px] font-semibold text-center">CASV</TableHead>
+                  <TableHead className="w-[120px] font-semibold text-center">Consulado</TableHead>
+                  <TableHead className="w-[180px] font-semibold text-center">Situação</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
