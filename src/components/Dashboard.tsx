@@ -1798,7 +1798,7 @@ export function Dashboard() {
 
       {/* History Dialog */}
       <Dialog open={historyDialog.open} onOpenChange={v => setHistoryDialog(prev => ({ ...prev, open: v }))}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-[85vw] w-[85vw] max-h-[60vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Histórico: {historyDialog.cliente?.nome}</DialogTitle>
           </DialogHeader>
@@ -1822,7 +1822,7 @@ export function Dashboard() {
 
       {/* BI Detail Modal */}
       <Dialog open={biDetailModal.open} onOpenChange={v => setBiDetailModal(prev => ({ ...prev, open: v }))}>
-        <DialogContent className="max-w-7xl w-full max-h-[90vh] p-0">
+        <DialogContent className="max-w-[95vw] w-[95vw] max-h-[75vh] p-0 flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-3 border-b">
             <DialogTitle className="flex items-center gap-2 text-xl">
               <PieChart className="w-6 h-6 text-blue-600" /> {biDetailModal.title}
@@ -1831,7 +1831,7 @@ export function Dashboard() {
               {biDetailModal.clientes.length} cliente(s) encontrado(s)
             </DialogDescription>
           </DialogHeader>
-          <div className="overflow-auto max-h-[calc(90vh-180px)] px-6 py-4">
+          <div className="overflow-auto flex-1 px-6 py-4">
             <Table className="w-full table-fixed min-w-[1120px]">
               <TableHeader>
                 <TableRow className="bg-slate-100">
