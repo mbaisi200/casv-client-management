@@ -220,16 +220,18 @@ export function Dashboard() {
     hoje.setHours(0, 0, 0, 0);
     const cincoDiasFuturo = new Date(hoje);
     cincoDiasFuturo.setDate(hoje.getDate() + 5);
-    const situacoesFinais = ['Aprovado', 'Aprovado só CASV', 'Reprovado'];
+    // Mostrar alertas de Consulado APENAS quando situação for 'CASV' ou 'Consulado'
+    const situacoesValidas = ['CASV', 'Consulado'];
 
     return clientes.filter(c => {
       if (c.deleted || c.tipo !== 'Visto') return false;
       if (!c.consulado) return false;
+      // Verificar se a situação é válida para mostrar alerta
+      if (!situacoesValidas.includes(c.situacao)) return false;
       const dataConsulado = new Date(c.consulado);
       if (isNaN(dataConsulado.getTime())) return false;
       dataConsulado.setHours(0, 0, 0, 0);
       if (dataConsulado > cincoDiasFuturo) return false;
-      if (situacoesFinais.includes(c.situacao)) return false;
       return true;
     }).sort((a, b) => new Date(a.consulado).getTime() - new Date(b.consulado).getTime());
   };
@@ -239,16 +241,18 @@ export function Dashboard() {
     hoje.setHours(0, 0, 0, 0);
     const cincoDiasFuturo = new Date(hoje);
     cincoDiasFuturo.setDate(hoje.getDate() + 5);
-    const situacoesFinais = ['Aprovado', 'Aprovado só CASV', 'Reprovado', 'Consulado'];
+    // Mostrar alertas de CASV APENAS quando situação for 'CASV'
+    const situacoesValidas = ['CASV'];
 
     return clientes.filter(c => {
       if (c.deleted || c.tipo !== 'Visto') return false;
       if (!c.casv) return false;
+      // Verificar se a situação é válida para mostrar alerta
+      if (!situacoesValidas.includes(c.situacao)) return false;
       const dataCASV = new Date(c.casv);
       if (isNaN(dataCASV.getTime())) return false;
       dataCASV.setHours(0, 0, 0, 0);
       if (dataCASV > cincoDiasFuturo) return false;
-      if (situacoesFinais.includes(c.situacao)) return false;
       return true;
     }).sort((a, b) => new Date(a.casv).getTime() - new Date(b.casv).getTime());
   };
