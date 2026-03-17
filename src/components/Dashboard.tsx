@@ -595,6 +595,13 @@ export function Dashboard() {
     if (['nome', 'agencia'].includes(field)) value = value.toUpperCase().trim();
 
     if (field === 'situacao' && value === 'Aguardando') {
+      // Atualização otimista no estado local
+      setClientes(prev => prev.map(cliente => 
+        cliente.id === id 
+          ? { ...cliente, dataInclusao: '', casv: '', consulado: '', situacao: 'Aguardando' }
+          : cliente
+      ));
+      
       await updateDoc(doc(db, 'clientes', id), {
         dataInclusao: '',
         casv: '',
@@ -603,7 +610,6 @@ export function Dashboard() {
         updatedAt: serverTimestamp(),
         updatedBy: user?.email
       });
-      loadClientes();
       return;
     }
 
@@ -624,6 +630,22 @@ export function Dashboard() {
     });
 
     try {
+      // Atualização otimista no estado local - atualiza IMEDIATAMENTE a UI
+      setClientes(prev => prev.map(cliente => {
+        if (cliente.id !== id) return cliente;
+        
+        const updated = { ...cliente, [field]: value };
+        
+        // Se mudou tipo para Passaporte, limpa campos de visto
+        if (field === 'tipo' && value === 'Passaporte') {
+          updated.casv = '';
+          updated.consulado = '';
+          updated.situacao = '';
+        }
+        
+        return updated;
+      }));
+
       const updateData: Record<string, any> = {
         historico: newHistorico,
         updatedAt: serverTimestamp(),
@@ -647,9 +669,11 @@ export function Dashboard() {
       }
 
       await updateDoc(doc(db, 'clientes', id), updateData);
-      loadClientes();
+      // Não chamamos loadClientes() aqui - a atualização otimista já foi feita
     } catch (error) {
+      // Em caso de erro, recarrega os dados do servidor
       toast({ title: 'Erro', description: 'Erro ao atualizar.', variant: 'destructive' });
+      loadClientes();
     }
   };
 
