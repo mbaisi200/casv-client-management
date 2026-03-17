@@ -1505,8 +1505,8 @@ export function Dashboard() {
                               <TableCell>
                                 <Input 
                                   type="date" 
-                                  value={c.dataInclusao} 
-                                  onChange={e => quickUpdate(c.id, 'dataInclusao', e.target.value)}
+                                  defaultValue={c.dataInclusao}
+                                  onBlur={e => quickUpdate(c.id, 'dataInclusao', e.target.value)}
                                   className="h-8 w-32"
                                 />
                               </TableCell>
@@ -1514,8 +1514,8 @@ export function Dashboard() {
                                 {c.tipo === 'Visto' ? (
                                   <Input 
                                     type="date" 
-                                    value={c.casv} 
-                                    onChange={e => quickUpdate(c.id, 'casv', e.target.value)}
+                                    defaultValue={c.casv}
+                                    onBlur={e => quickUpdate(c.id, 'casv', e.target.value)}
                                     className="h-8 w-32"
                                   />
                                 ) : <span className="text-slate-400">-</span>}
@@ -1524,8 +1524,8 @@ export function Dashboard() {
                                 {c.tipo === 'Visto' ? (
                                   <Input 
                                     type="date" 
-                                    value={c.consulado} 
-                                    onChange={e => quickUpdate(c.id, 'consulado', e.target.value)}
+                                    defaultValue={c.consulado}
+                                    onBlur={e => quickUpdate(c.id, 'consulado', e.target.value)}
                                     className="h-8 w-32"
                                   />
                                 ) : <span className="text-slate-400">-</span>}
