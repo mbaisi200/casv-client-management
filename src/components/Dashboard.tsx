@@ -585,6 +585,15 @@ export function Dashboard() {
     });
   };
 
+  // Função auxiliar para validar formato de data
+  const isValidDateFormat = (dateStr: string): boolean => {
+    if (!dateStr) return false;
+    const regex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!regex.test(dateStr)) return false;
+    const date = new Date(dateStr);
+    return !isNaN(date.getTime());
+  };
+
   const quickUpdate = async (id: string, field: string, value: string) => {
     const c = clientes.find(x => x.id === id);
     if (!c) return;
@@ -594,6 +603,22 @@ export function Dashboard() {
     
     if (['nome', 'agencia'].includes(field)) value = value.toUpperCase().trim();
 
+    // Validação de data do consulado: só valida se a data estiver completa e válida
+    if (field === 'consulado' && value && isValidDateFormat(value) && c.casv && isValidDateFormat(c.casv)) {
+      if (value < c.casv) {
+        toast({ title: 'Erro', description: 'Data Consulado não pode ser anterior à data CASV.', variant: 'destructive' });
+        return;
+      }
+    }
+
+    // Validação de data do CASV: só valida se a data estiver completa e válida
+    if (field === 'casv' && value && isValidDateFormat(value) && c.consulado && isValidDateFormat(c.consulado)) {
+      if (c.consulado < value) {
+        toast({ title: 'Erro', description: 'Data CASV não pode ser posterior à data Consulado.', variant: 'destructive' });
+        return;
+      }
+    }
+
     if (field === 'situacao' && value === 'Aguardando') {
       // Atualização otimista no estado local
       setClientes(prev => prev.map(cliente => 
@@ -602,27 +627,33 @@ export function Dashboard() {
           : cliente
       ));
       
-      await updateDoc(doc(db, 'clientes', id), {
-        dataInclusao: '',
-        casv: '',
-        consulado: '',
-        situacao: 'Aguardando',
-        updatedAt: serverTimestamp(),
-        updatedBy: user?.email
-      });
+      try {
+        await updateDoc(doc(db, 'clientes', id), {
+          dataInclusao: '',
+          casv: '',
+          consulado: '',
+          situacao: 'Aguardando',
+          updatedAt: serverTimestamp(),
+          updatedBy: user?.email
+        });
+        toast({ title: 'Sucesso', description: 'Situação alterada para Aguardando. Dados gravados no banco.' });
+      } catch (error) {
+        toast({ title: 'Erro', description: 'Erro ao atualizar no banco de dados.', variant: 'destructive' });
+        loadClientes();
+      }
       return;
     }
 
-    if (field === 'consulado' && c.casv && value < c.casv) {
-      toast({ title: 'Erro', description: 'Data Consulado anterior à CASV.', variant: 'destructive' });
-      return;
-    }
+    const valorAnterior = String(c[field as keyof Cliente] || '');
+    
+    // Se o valor não mudou, não faz nada
+    if (valorAnterior === value) return;
 
     const newHistorico = [...(c.historico || [])];
     newHistorico.push({
       acao: 'Edição Rápida',
       campo: field,
-      valorAnterior: String(c[field as keyof Cliente] || ''),
+      valorAnterior,
       valorNovo: value,
       data: new Date().toISOString(),
       usuario: user?.email || 'Sistema',
@@ -669,10 +700,26 @@ export function Dashboard() {
       }
 
       await updateDoc(doc(db, 'clientes', id), updateData);
-      // Não chamamos loadClientes() aqui - a atualização otimista já foi feita
+      
+      // Mensagem de sucesso confirmando gravação no banco
+      const fieldNames: Record<string, string> = {
+        nome: 'Nome',
+        agencia: 'Agência',
+        cidade: 'Cidade',
+        dataInclusao: 'Data de Inclusão',
+        casv: 'Data CASV',
+        consulado: 'Data Consulado',
+        situacao: 'Situação',
+        tipo: 'Tipo'
+      };
+      toast({ 
+        title: '✅ Salvo com sucesso', 
+        description: `${fieldNames[field] || field} alterado${value ? ` para ${field === 'situacao' || field === 'tipo' || field === 'cidade' ? value : (field.includes('data') || field === 'casv' || field === 'consulado') ? formatDate(value) : value}` : ''} e gravado no banco de dados.` 
+      });
+      
     } catch (error) {
       // Em caso de erro, recarrega os dados do servidor
-      toast({ title: 'Erro', description: 'Erro ao atualizar.', variant: 'destructive' });
+      toast({ title: 'Erro', description: 'Erro ao gravar no banco de dados. Tente novamente.', variant: 'destructive' });
       loadClientes();
     }
   };
