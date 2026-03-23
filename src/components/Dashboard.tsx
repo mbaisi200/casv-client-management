@@ -86,13 +86,21 @@ export function Dashboard() {
   const [showHidden, setShowHidden] = useState(false);
   const [activeTab, setActiveTab] = useState('list');
   
+  // Helper para obter data atual no formato YYYY-MM-DD (usado na inicialização)
+  const getTodayDateString = () => {
+    const now = new Date();
+    const offset = -3; // UTC-3 (Brasília)
+    const localTime = new Date(now.getTime() + (offset * 60 * 60 * 1000));
+    return localTime.toISOString().split('T')[0];
+  };
+
   // Form state
   const [formData, setFormData] = useState({
     nome: '',
     agencia: '',
     tipo: 'Visto' as 'Visto' | 'Passaporte',
     cidade: '',
-    dataInclusao: '',
+    dataInclusao: getTodayDateString(),
     casv: '',
     consulado: '',
     situacao: ''
@@ -331,16 +339,24 @@ export function Dashboard() {
             bVal = b.cidade.toLowerCase();
             break;
           case 'dataInclusao':
-            aVal = a.dataInclusao ? new Date(a.dataInclusao).getTime() : 0;
-            bVal = b.dataInclusao ? new Date(b.dataInclusao).getTime() : 0;
+            // Usar comparação de string (YYYY-MM-DD ordena corretamente)
+            // Tratar datas vazias: em ordem ascendente, vazias vão para o final
+            aVal = a.dataInclusao || '';
+            bVal = b.dataInclusao || '';
+            if (!aVal && bVal) return sort.direction === 'asc' ? 1 : -1;
+            if (aVal && !bVal) return sort.direction === 'asc' ? -1 : 1;
             break;
           case 'casv':
-            aVal = a.casv ? new Date(a.casv).getTime() : 0;
-            bVal = b.casv ? new Date(b.casv).getTime() : 0;
+            aVal = a.casv || '';
+            bVal = b.casv || '';
+            if (!aVal && bVal) return sort.direction === 'asc' ? 1 : -1;
+            if (aVal && !bVal) return sort.direction === 'asc' ? -1 : 1;
             break;
           case 'consulado':
-            aVal = a.consulado ? new Date(a.consulado).getTime() : 0;
-            bVal = b.consulado ? new Date(b.consulado).getTime() : 0;
+            aVal = a.consulado || '';
+            bVal = b.consulado || '';
+            if (!aVal && bVal) return sort.direction === 'asc' ? 1 : -1;
+            if (aVal && !bVal) return sort.direction === 'asc' ? -1 : 1;
             break;
           case 'situacao':
             aVal = a.situacao.toLowerCase();
@@ -530,7 +546,7 @@ export function Dashboard() {
       agencia: '',
       tipo: 'Visto',
       cidade: '',
-      dataInclusao: '',
+      dataInclusao: getTodayDateString(),
       casv: '',
       consulado: '',
       situacao: ''
