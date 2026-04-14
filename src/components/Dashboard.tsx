@@ -1154,7 +1154,7 @@ export function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-6">
+    <div className="min-h-screen bg-slate-50 p-4 md:p-6 overflow-x-hidden">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-4 rounded-lg shadow-sm">
@@ -1439,35 +1439,34 @@ export function Dashboard() {
             {/* Table */}
             <Card>
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="table-fixed w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('nome')}>
+                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none w-[14%] max-w-[14%]" onClick={() => handleSort('nome')}>
                           Nome {getSortIndicator('nome')}
                         </TableHead>
-                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('agencia')}>
+                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none w-[10%] max-w-[10%]" onClick={() => handleSort('agencia')}>
                           Agência {getSortIndicator('agencia')}
                         </TableHead>
-                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('tipo')}>
+                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none w-[9%] max-w-[9%]" onClick={() => handleSort('tipo')}>
                           Tipo {getSortIndicator('tipo')}
                         </TableHead>
-                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('cidade')}>
+                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none w-[10%] max-w-[10%]" onClick={() => handleSort('cidade')}>
                           Cidade {getSortIndicator('cidade')}
                         </TableHead>
-                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('dataInclusao')}>
-                          Data Inclusão {getSortIndicator('dataInclusao')}
+                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none w-[11%] max-w-[11%]" onClick={() => handleSort('dataInclusao')}>
+                          Inclusão {getSortIndicator('dataInclusao')}
                         </TableHead>
-                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('casv')}>
-                          Data CASV {getSortIndicator('casv')}
+                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none w-[11%] max-w-[11%]" onClick={() => handleSort('casv')}>
+                          CASV {getSortIndicator('casv')}
                         </TableHead>
-                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('consulado')}>
-                          Data Consulado {getSortIndicator('consulado')}
+                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none w-[11%] max-w-[11%]" onClick={() => handleSort('consulado')}>
+                          Consulado {getSortIndicator('consulado')}
                         </TableHead>
-                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('situacao')}>
+                        <TableHead className="cursor-pointer hover:bg-slate-100 select-none w-[11%] max-w-[11%]" onClick={() => handleSort('situacao')}>
                           Situação {getSortIndicator('situacao')}
                         </TableHead>
-                        <TableHead>Ações</TableHead>
+                        <TableHead className="w-[13%] max-w-[13%]">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1490,7 +1489,8 @@ export function Dashboard() {
                                 contentEditable 
                                 suppressContentEditableWarning
                                 onBlur={e => quickUpdate(c.id, 'nome', e.currentTarget.textContent || '')}
-                                className="font-medium"
+                                className="font-medium truncate max-w-[14%]"
+                                title={c.nome}
                               >
                                 {c.nome}
                               </TableCell>
@@ -1498,12 +1498,14 @@ export function Dashboard() {
                                 contentEditable 
                                 suppressContentEditableWarning
                                 onBlur={e => quickUpdate(c.id, 'agencia', e.currentTarget.textContent || '')}
+                                className="truncate max-w-[10%]"
+                                title={c.agencia}
                               >
                                 {c.agencia}
                               </TableCell>
                               <TableCell>
                                 <Select value={c.tipo || 'Visto'} onValueChange={v => quickUpdate(c.id, 'tipo', v)}>
-                                  <SelectTrigger className="h-8 w-24"><SelectValue /></SelectTrigger>
+                                  <SelectTrigger className="h-7 w-full text-xs"><SelectValue /></SelectTrigger>
                                   <SelectContent>
                                     {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                                   </SelectContent>
@@ -1511,7 +1513,7 @@ export function Dashboard() {
                               </TableCell>
                               <TableCell>
                                 <Select value={c.cidade || NONE_VALUE} onValueChange={v => quickUpdate(c.id, 'cidade', v === NONE_VALUE ? '' : v)}>
-                                  <SelectTrigger className="h-8 w-28"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                                  <SelectTrigger className="h-7 w-full text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value={NONE_VALUE}>Selecione</SelectItem>
                                     {CIDADES.map(ci => <SelectItem key={ci} value={ci}>{ci}</SelectItem>)}
@@ -1523,7 +1525,7 @@ export function Dashboard() {
                                   type="date" 
                                   defaultValue={c.dataInclusao}
                                   onBlur={e => quickUpdate(c.id, 'dataInclusao', e.target.value)}
-                                  className="h-8 w-32"
+                                  className="h-7 w-full text-xs"
                                 />
                               </TableCell>
                               <TableCell>
@@ -1532,7 +1534,7 @@ export function Dashboard() {
                                     type="date" 
                                     defaultValue={c.casv}
                                     onBlur={e => quickUpdate(c.id, 'casv', e.target.value)}
-                                    className="h-8 w-32"
+                                    className="h-7 w-full text-xs"
                                   />
                                 ) : <span className="text-slate-400">-</span>}
                               </TableCell>
@@ -1542,14 +1544,14 @@ export function Dashboard() {
                                     type="date" 
                                     defaultValue={c.consulado}
                                     onBlur={e => quickUpdate(c.id, 'consulado', e.target.value)}
-                                    className="h-8 w-32"
+                                    className="h-7 w-full text-xs"
                                   />
                                 ) : <span className="text-slate-400">-</span>}
                               </TableCell>
                               <TableCell>
                                 {c.tipo === 'Visto' ? (
                                   <Select value={c.situacao || NONE_VALUE} onValueChange={v => quickUpdate(c.id, 'situacao', v === NONE_VALUE ? '' : v)}>
-                                    <SelectTrigger className="h-8 w-28"><SelectValue placeholder="--" /></SelectTrigger>
+                                    <SelectTrigger className="h-7 w-full text-xs"><SelectValue placeholder="--" /></SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value={NONE_VALUE}>--</SelectItem>
                                       {SITUACOES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -1558,15 +1560,15 @@ export function Dashboard() {
                                 ) : <Badge variant="outline" className="bg-amber-100 text-amber-800">PASSAPORTE</Badge>}
                               </TableCell>
                               <TableCell>
-                                <div className="flex gap-1">
-                                  <Button size="sm" variant="outline" onClick={() => prepareEdit(c)}>
-                                    <Edit className="w-4 h-4" />
+                                <div className="flex gap-0.5 justify-center">
+                                  <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => prepareEdit(c)} title="Editar">
+                                    <Edit className="w-3.5 h-3.5" />
                                   </Button>
-                                  <Button size="sm" variant="outline" onClick={() => setHistoryDialog({ open: true, cliente: c })}>
-                                    <History className="w-4 h-4" />
+                                  <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => setHistoryDialog({ open: true, cliente: c })} title="Histórico">
+                                    <History className="w-3.5 h-3.5" />
                                   </Button>
-                                  <Button size="sm" variant="destructive" onClick={() => deleteClient(c)}>
-                                    <Trash2 className="w-4 h-4" />
+                                  <Button size="icon" variant="destructive" className="h-7 w-7" onClick={() => deleteClient(c)} title="Excluir">
+                                    <Trash2 className="w-3.5 h-3.5" />
                                   </Button>
                                 </div>
                               </TableCell>
@@ -1576,7 +1578,6 @@ export function Dashboard() {
                       )}
                     </TableBody>
                   </Table>
-                </div>
               </CardContent>
             </Card>
 
