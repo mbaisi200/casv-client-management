@@ -70,7 +70,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const CIDADES = ['São Paulo', 'Rio de Janeiro', 'Brasilia', 'Porto Alegre', 'Recife'];
-const SITUACOES = ['Aguardando', 'Aprovado', 'Aprovado só CASV', 'CASV', 'Consulado', 'Reprovado'];
+const SITUACOES = ['Aguardando', 'Aprovado', 'Aprovado só CASV', 'CASV', 'Consulado', 'Mudar Consulado', 'Reprovado'];
 const TIPOS = ['Visto', 'Passaporte'];
 const ALL_VALUE = '__ALL__';
 const NONE_VALUE = '__NONE__';
@@ -265,8 +265,30 @@ export function Dashboard() {
     }).sort((a, b) => new Date(a.casv).getTime() - new Date(b.casv).getTime());
   };
 
+  const checkMudarConsuladoAlerts = () => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const cincoDiasFuturo = new Date(hoje);
+    cincoDiasFuturo.setDate(hoje.getDate() + 5);
+    // Mostrar alertas de Mudar Consulado APENAS quando situação for 'Mudar Consulado'
+    const situacoesValidas = ['Mudar Consulado'];
+
+    return clientes.filter(c => {
+      if (c.deleted || c.tipo !== 'Visto') return false;
+      if (!c.consulado) return false;
+      // Verificar se a situação é válida para mostrar alerta
+      if (!situacoesValidas.includes(c.situacao)) return false;
+      const dataConsulado = new Date(c.consulado);
+      if (isNaN(dataConsulado.getTime())) return false;
+      dataConsulado.setHours(0, 0, 0, 0);
+      if (dataConsulado > cincoDiasFuturo) return false;
+      return true;
+    }).sort((a, b) => new Date(a.consulado).getTime() - new Date(b.consulado).getTime());
+  };
+
   const consuladoAlerts = checkConsuladoAlerts();
   const casvAlerts = checkCASVAlerts();
+  const mudarConsuladoAlerts = checkMudarConsuladoAlerts();
 
   // Filter clients
   const getFilteredClients = () => {
@@ -396,6 +418,7 @@ export function Dashboard() {
       'CASV': 0,
       'Aprovado só CASV': 0,
       'Consulado': 0,
+      'Mudar Consulado': 0,
       'Não definido': 0
     };
 
@@ -1180,54 +1203,159 @@ export function Dashboard() {
 
         {/* Alerts */}
         {consuladoAlerts.length > 0 && (
-          <Card className="border-red-300 bg-red-50">
+          <Card className="border-red-200 bg-red-50 shadow-md">
             <CardHeader className="pb-2">
-              <CardTitle className="text-red-800 flex items-center gap-2 text-base">
-                <AlertTriangle className="w-5 h-5" />
-                CLIENTES COM DATA CONSULADO EM 5 DIAS
-                <Badge className="bg-red-600">{consuladoAlerts.length}</Badge>
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-red-800 text-base">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                  CONSULADO - 5 DIAS
+                </CardTitle>
+                <Badge className="bg-red-600 text-white font-bold px-2 py-1">
+                  {consuladoAlerts.length}
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {consuladoAlerts.map(c => (
-                  <div key={c.id} className="flex items-center justify-between bg-white p-2 rounded border border-red-200">
-                    <div>
-                      <div className="font-medium">{c.nome}</div>
-                      <div className="text-sm text-slate-600">{c.agencia} • Consulado: {formatDate(c.consulado)}</div>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => prepareEdit(c)}>
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
+              <div className="max-h-52 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-red-50">
+                    <tr className="text-left text-red-700 font-medium">
+                      <th className="p-2">Nome</th>
+                      <th className="p-2">Agência</th>
+                      <th className="p-2">Data</th>
+                      <th className="p-2 text-center">Dias</th>
+                      <th className="p-2 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {consuladoAlerts.map(c => {
+                      const dias = Math.ceil((new Date(c.consulado).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                      return (
+                        <tr key={c.id} className="border-t border-red-100 hover:bg-white/60 transition-colors">
+                          <td className="p-2 font-medium text-slate-800">{c.nome}</td>
+                          <td className="p-2 text-slate-600">{c.agencia}</td>
+                          <td className="p-2 text-slate-700">{formatDate(c.consulado)}</td>
+                          <td className="p-2 text-center">
+                            <Badge className={`text-xs ${dias <= 2 ? 'bg-red-600' : 'bg-red-100 text-red-700 border-red-200'}`}>
+                              {dias === 0 ? 'HOJE' : dias}
+                            </Badge>
+                          </td>
+                          <td className="p-2">
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-red-100" onClick={() => prepareEdit(c)}>
+                              <Edit className="w-3.5 h-3.5" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>
         )}
 
         {casvAlerts.length > 0 && (
-          <Card className="border-amber-300 bg-amber-50">
+          <Card className="border-amber-200 bg-amber-50 shadow-md">
             <CardHeader className="pb-2">
-              <CardTitle className="text-amber-800 flex items-center gap-2 text-base">
-                <AlertTriangle className="w-5 h-5" />
-                CLIENTES COM DATA CASV EM 5 DIAS
-                <Badge className="bg-amber-600">{casvAlerts.length}</Badge>
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-amber-800 text-base">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  CASV - 5 DIAS
+                </CardTitle>
+                <Badge className="bg-amber-600 text-white font-bold px-2 py-1">
+                  {casvAlerts.length}
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {casvAlerts.map(c => (
-                  <div key={c.id} className="flex items-center justify-between bg-white p-2 rounded border border-amber-200">
-                    <div>
-                      <div className="font-medium">{c.nome}</div>
-                      <div className="text-sm text-slate-600">{c.agencia} • CASV: {formatDate(c.casv)}</div>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => prepareEdit(c)}>
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
+              <div className="max-h-52 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-amber-50">
+                    <tr className="text-left text-amber-700 font-medium">
+                      <th className="p-2">Nome</th>
+                      <th className="p-2">Agência</th>
+                      <th className="p-2">Data</th>
+                      <th className="p-2 text-center">Dias</th>
+                      <th className="p-2 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {casvAlerts.map(c => {
+                      const dias = Math.ceil((new Date(c.casv).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                      return (
+                        <tr key={c.id} className="border-t border-amber-100 hover:bg-white/60 transition-colors">
+                          <td className="p-2 font-medium text-slate-800">{c.nome}</td>
+                          <td className="p-2 text-slate-600">{c.agencia}</td>
+                          <td className="p-2 text-slate-700">{formatDate(c.casv)}</td>
+                          <td className="p-2 text-center">
+                            <Badge className={`text-xs ${dias <= 2 ? 'bg-amber-600' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                              {dias === 0 ? 'HOJE' : dias}
+                            </Badge>
+                          </td>
+                          <td className="p-2">
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-amber-100" onClick={() => prepareEdit(c)}>
+                              <Edit className="w-3.5 h-3.5" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {mudarConsuladoAlerts.length > 0 && (
+          <Card className="border-blue-200 bg-blue-50 shadow-md">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-blue-800 text-base">
+                  <AlertTriangle className="w-5 h-5 text-blue-600" />
+                  MUDAR CONSULADO - 5 DIAS
+                </CardTitle>
+                <Badge className="bg-blue-600 text-white font-bold px-2 py-1">
+                  {mudarConsuladoAlerts.length}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="max-h-52 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-blue-50">
+                    <tr className="text-left text-blue-700 font-medium">
+                      <th className="p-2">Nome</th>
+                      <th className="p-2">Agência</th>
+                      <th className="p-2">Data</th>
+                      <th className="p-2 text-center">Dias</th>
+                      <th className="p-2 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mudarConsuladoAlerts.map(c => {
+                      const dias = Math.ceil((new Date(c.consulado).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                      return (
+                        <tr key={c.id} className="border-t border-blue-100 hover:bg-white/60 transition-colors">
+                          <td className="p-2 font-medium text-slate-800">{c.nome}</td>
+                          <td className="p-2 text-slate-600">{c.agencia}</td>
+                          <td className="p-2 text-slate-700">{formatDate(c.consulado)}</td>
+                          <td className="p-2 text-center">
+                            <Badge className={`text-xs ${dias <= 2 ? 'bg-blue-600' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
+                              {dias === 0 ? 'HOJE' : dias}
+                            </Badge>
+                          </td>
+                          <td className="p-2">
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-blue-100" onClick={() => prepareEdit(c)}>
+                              <Edit className="w-3.5 h-3.5" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>
@@ -1720,6 +1848,7 @@ export function Dashboard() {
                       'CASV': 'from-blue-500 to-blue-600',
                       'Aprovado só CASV': 'from-emerald-500 to-emerald-600',
                       'Consulado': 'from-violet-500 to-violet-600',
+                      'Mudar Consulado': 'from-blue-500 to-blue-600',
                       'Não definido': 'from-gray-400 to-gray-500'
                     };
                     return (
@@ -1963,6 +2092,7 @@ export function Dashboard() {
                           c.situacao === 'CASV' ? 'bg-blue-100 text-blue-800 border-blue-300' :
                           c.situacao === 'Aprovado só CASV' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
                           c.situacao === 'Consulado' ? 'bg-violet-100 text-violet-800 border-violet-300' :
+                          c.situacao === 'Mudar Consulado' ? 'bg-blue-100 text-blue-800 border-blue-300' :
                           'bg-gray-100 text-gray-800 border-gray-300'
                         }>
                           {c.situacao || 'Não definido'}
