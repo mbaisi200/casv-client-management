@@ -19,6 +19,7 @@ export interface Cliente {
   casv: string;
   consulado: string;
   situacao: string;
+  mudarConsulado: boolean;
   historico: HistoricoEntry[];
   createdAt: Date;
   updatedAt?: Date;

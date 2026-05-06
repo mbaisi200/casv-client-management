@@ -18,6 +18,7 @@ import { Cliente, HistoricoEntry, FilterState, SortState } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -70,7 +71,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const CIDADES = ['São Paulo', 'Rio de Janeiro', 'Brasilia', 'Porto Alegre', 'Recife'];
-const SITUACOES = ['Aguardando', 'Aprovado', 'Aprovado só CASV', 'CASV', 'Consulado', 'Mudar Consulado', 'Reprovado'];
+const SITUACOES = ['Aguardando', 'Aprovado', 'Aprovado só CASV', 'CASV', 'Consulado', 'Reprovado'];
 const TIPOS = ['Visto', 'Passaporte'];
 const ALL_VALUE = '__ALL__';
 const NONE_VALUE = '__NONE__';
@@ -103,7 +104,8 @@ export function Dashboard() {
     dataInclusao: getTodayDateString(),
     casv: '',
     consulado: '',
-    situacao: ''
+    situacao: '',
+    mudarConsulado: false
   });
 
   // Filter state
@@ -188,6 +190,7 @@ export function Dashboard() {
           casv: d.casv || '',
           consulado: d.consulado || '',
           situacao: d.situacao || '',
+          mudarConsulado: d.mudarConsulado || false,
           historico: d.historico || [],
           createdAt: d.createdAt?.toDate?.() || new Date(),
           updatedAt: d.updatedAt?.toDate?.(),
@@ -234,6 +237,8 @@ export function Dashboard() {
     return clientes.filter(c => {
       if (c.deleted || c.tipo !== 'Visto') return false;
       if (!c.consulado) return false;
+      // Se estiver marcado para mudar de consulado, não mostrar no card Consulado
+      if (c.mudarConsulado) return false;
       // Verificar se a situação é válida para mostrar alerta
       if (!situacoesValidas.includes(c.situacao)) return false;
       const dataConsulado = new Date(c.consulado);
@@ -270,18 +275,16 @@ export function Dashboard() {
     hoje.setHours(0, 0, 0, 0);
     const cincoDiasFuturo = new Date(hoje);
     cincoDiasFuturo.setDate(hoje.getDate() + 5);
-    // Mostrar alertas de Mudar Consulado APENAS quando situação for 'Mudar Consulado'
-    const situacoesValidas = ['Mudar Consulado'];
 
     return clientes.filter(c => {
       if (c.deleted || c.tipo !== 'Visto') return false;
       if (!c.consulado) return false;
-      // Verificar se a situação é válida para mostrar alerta
-      if (!situacoesValidas.includes(c.situacao)) return false;
+      // Mostrar alerta somente se o checkbox Mudar Consulado estiver marcado
+      if (!c.mudarConsulado) return false;
       const dataConsulado = new Date(c.consulado);
       if (isNaN(dataConsulado.getTime())) return false;
       dataConsulado.setHours(0, 0, 0, 0);
-      if (dataConsulado > cincoDiasFuturo) return false;
+      // Mostrar o alerta a todo momento (removido a verificação dos 5 dias)
       return true;
     }).sort((a, b) => new Date(a.consulado).getTime() - new Date(b.consulado).getTime());
   };
@@ -537,6 +540,7 @@ export function Dashboard() {
       casv: formData.casv,
       consulado: formData.consulado,
       situacao: formData.situacao,
+      mudarConsulado: formData.mudarConsulado,
       historico,
       updatedAt: serverTimestamp(),
       updatedBy: user?.email
@@ -572,7 +576,8 @@ export function Dashboard() {
       dataInclusao: getTodayDateString(),
       casv: '',
       consulado: '',
-      situacao: ''
+      situacao: '',
+      mudarConsulado: false
     });
     setEditingId(null);
   };
@@ -586,7 +591,8 @@ export function Dashboard() {
       dataInclusao: cliente.dataInclusao,
       casv: cliente.casv,
       consulado: cliente.consulado,
-      situacao: cliente.situacao
+      situacao: cliente.situacao,
+      mudarConsulado: cliente.mudarConsulado || false
     });
     setEditingId(cliente.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1202,6 +1208,59 @@ export function Dashboard() {
         </div>
 
         {/* Alerts */}
+        {mudarConsuladoAlerts.length > 0 && (
+           <Card className="border-blue-200 bg-blue-50 shadow-md">
+             <CardHeader className="pb-2">
+               <div className="flex items-center justify-between">
+                 <CardTitle className="flex items-center gap-2 text-blue-800 text-base">
+                   <AlertTriangle className="w-5 h-5 text-blue-600" />
+                   MUDAR CONSULADO
+                 </CardTitle>
+                 <Badge className="bg-blue-600 text-white font-bold px-2 py-1">
+                   {mudarConsuladoAlerts.length}
+                 </Badge>
+               </div>
+             </CardHeader>
+            <CardContent className="pt-0">
+              <div className="max-h-52 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-blue-50">
+                    <tr className="text-left text-blue-700 font-medium">
+                      <th className="p-2">Nome</th>
+                      <th className="p-2">Agência</th>
+                      <th className="p-2">Data</th>
+                      <th className="p-2 text-center">Dias</th>
+                      <th className="p-2 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mudarConsuladoAlerts.map(c => {
+                      const dias = Math.ceil((new Date(c.consulado).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                      return (
+                        <tr key={c.id} className="border-t border-blue-100 hover:bg-white/60 transition-colors">
+                          <td className="p-2 font-medium text-slate-800">{c.nome}</td>
+                          <td className="p-2 text-slate-600">{c.agencia}</td>
+                          <td className="p-2 text-slate-700">{formatDate(c.consulado)}</td>
+                          <td className="p-2 text-center">
+                            <Badge className={`text-xs ${dias <= 2 ? 'bg-blue-600' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
+                              {dias === 0 ? 'HOJE' : dias}
+                            </Badge>
+                          </td>
+                          <td className="p-2">
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-blue-100" onClick={() => prepareEdit(c)}>
+                              <Edit className="w-3.5 h-3.5" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {consuladoAlerts.length > 0 && (
           <Card className="border-red-200 bg-red-50 shadow-md">
             <CardHeader className="pb-2">
@@ -1308,59 +1367,6 @@ export function Dashboard() {
           </Card>
         )}
 
-        {mudarConsuladoAlerts.length > 0 && (
-          <Card className="border-blue-200 bg-blue-50 shadow-md">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-blue-800 text-base">
-                  <AlertTriangle className="w-5 h-5 text-blue-600" />
-                  MUDAR CONSULADO - 5 DIAS
-                </CardTitle>
-                <Badge className="bg-blue-600 text-white font-bold px-2 py-1">
-                  {mudarConsuladoAlerts.length}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="max-h-52 overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-blue-50">
-                    <tr className="text-left text-blue-700 font-medium">
-                      <th className="p-2">Nome</th>
-                      <th className="p-2">Agência</th>
-                      <th className="p-2">Data</th>
-                      <th className="p-2 text-center">Dias</th>
-                      <th className="p-2 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mudarConsuladoAlerts.map(c => {
-                      const dias = Math.ceil((new Date(c.consulado).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-                      return (
-                        <tr key={c.id} className="border-t border-blue-100 hover:bg-white/60 transition-colors">
-                          <td className="p-2 font-medium text-slate-800">{c.nome}</td>
-                          <td className="p-2 text-slate-600">{c.agencia}</td>
-                          <td className="p-2 text-slate-700">{formatDate(c.consulado)}</td>
-                          <td className="p-2 text-center">
-                            <Badge className={`text-xs ${dias <= 2 ? 'bg-blue-600' : 'bg-blue-100 text-blue-700 border-blue-200'}`}>
-                              {dias === 0 ? 'HOJE' : dias}
-                            </Badge>
-                          </td>
-                          <td className="p-2">
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-blue-100" onClick={() => prepareEdit(c)}>
-                              <Edit className="w-3.5 h-3.5" />
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
@@ -1440,16 +1446,23 @@ export function Dashboard() {
                           onChange={e => setFormData(prev => ({ ...prev, consulado: e.target.value }))}
                         />
                       </div>
-                      <div>
-                        <Label>Situação</Label>
-                        <Select value={formData.situacao || NONE_VALUE} onValueChange={v => setFormData(prev => ({ ...prev, situacao: v === NONE_VALUE ? '' : v }))}>
-                          <SelectTrigger><SelectValue placeholder="-- Selecione --" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={NONE_VALUE}>-- Selecione --</SelectItem>
-                            {SITUACOES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
+<div className="flex items-center gap-2">
+                         <Label>Situação</Label>
+                         <Select value={formData.situacao || NONE_VALUE} onValueChange={v => setFormData(prev => ({ ...prev, situacao: v === NONE_VALUE ? '' : v }))}>
+                           <SelectTrigger><SelectValue placeholder="-- Selecione --" /></SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value={NONE_VALUE}>-- Selecione --</SelectItem>
+                             {SITUACOES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                           </SelectContent>
+                         </Select>
+                       </div>
+                       <div className="flex items-center gap-2">
+                         <Checkbox
+                           checked={formData.mudarConsulado}
+                           onCheckedChange={checked => setFormData(prev => ({ ...prev, mudarConsulado: checked }))}
+                         />
+                         <span className="text-sm">Mudar de Consulado</span>
+                       </div>
                     </>
                   )}
                 </div>
