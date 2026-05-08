@@ -423,7 +423,7 @@ export function Dashboard() {
     const passaportes = filtered.filter(c => c.tipo === 'Passaporte');
 
     vistos.forEach(c => {
-      const s = c.situacao || 'Não definido';
+      const s = (c.situacao || '').trim() || 'Não definido';
       if (stats[s] !== undefined) stats[s]++;
       else stats['Não definido']++;
     });
@@ -437,7 +437,7 @@ export function Dashboard() {
       }
       if (c.tipo === 'Visto') {
         byAgency[ag].vistos++;
-        const s = c.situacao || 'Não definido';
+        const s = (c.situacao || '').trim() || 'Não definido';
         byAgency[ag].situacoes[s] = (byAgency[ag].situacoes[s] || 0) + 1;
       } else {
         byAgency[ag].passaportes++;
@@ -452,7 +452,7 @@ export function Dashboard() {
         byCity[city] = { total: 0, situacoes: {} };
       }
       byCity[city].total++;
-      const s = c.situacao || 'Não definido';
+      const s = (c.situacao || '').trim() || 'Não definido';
       byCity[city].situacoes[s] = (byCity[city].situacoes[s] || 0) + 1;
     });
 
@@ -465,7 +465,8 @@ export function Dashboard() {
           byMonth[month] = { total: 0, aprovados: 0 };
         }
         byMonth[month].total++;
-        if (c.situacao === 'Aprovado' || c.situacao === 'Aprovado só CASV') {
+        const sit = (c.situacao || '').trim();
+        if (sit === 'Aprovado' || sit === 'Aprovado só CASV') {
           byMonth[month].aprovados++;
         }
       }
@@ -676,6 +677,7 @@ export function Dashboard() {
           updatedBy: user?.email
         });
         toast({ title: 'Sucesso', description: 'Situação alterada para Aguardando. Dados gravados no banco.' });
+        loadClientes();
       } catch (error) {
         toast({ title: 'Erro', description: 'Erro ao atualizar no banco de dados.', variant: 'destructive' });
         loadClientes();
@@ -755,6 +757,7 @@ export function Dashboard() {
         title: '✅ Salvo com sucesso', 
         description: `${fieldNames[field] || field} alterado${value ? ` para ${field === 'situacao' || field === 'tipo' || field === 'cidade' ? value : (field.includes('data') || field === 'casv' || field === 'consulado') ? formatDate(value) : value}` : ''} e gravado no banco de dados.` 
       });
+      loadClientes();
       
     } catch (error) {
       // Em caso de erro, recarrega os dados do servidor
@@ -1143,7 +1146,7 @@ export function Dashboard() {
       
       switch (filterType) {
         case 'situacao':
-          return c.tipo === 'Visto' && (c.situacao || 'Não definido') === filterValue;
+          return c.tipo === 'Visto' && ((c.situacao || '').trim() || 'Não definido') === filterValue;
         case 'tipo':
           return c.tipo === filterValue;
         case 'agencia':
@@ -1153,7 +1156,7 @@ export function Dashboard() {
         case 'total':
           return true;
         case 'aprovados':
-          return c.situacao === 'Aprovado' || c.situacao === 'Aprovado só CASV';
+          return (c.situacao || '').trim() === 'Aprovado' || (c.situacao || '').trim() === 'Aprovado só CASV';
         default:
           return true;
       }
@@ -2080,33 +2083,36 @@ export function Dashboard() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  biDetailModal.clientes.map(c => (
-                    <TableRow key={c.id} className="hover:bg-blue-50 cursor-pointer transition-colors" onClick={() => {
-                      setBiDetailModal(prev => ({ ...prev, open: false }));
-                      prepareEdit(c);
-                      setActiveTab('list');
-                    }}>
-                      <TableCell className="font-medium truncate" title={c.nome}>{c.nome}</TableCell>
-                      <TableCell className="truncate" title={c.agencia}>{c.agencia}</TableCell>
-                      <TableCell className="text-center truncate">{c.cidade || '-'}</TableCell>
-                      <TableCell className="text-center whitespace-nowrap">{formatDate(c.dataInclusao)}</TableCell>
-                      <TableCell className="text-center whitespace-nowrap">{formatDate(c.casv)}</TableCell>
-                      <TableCell className="text-center whitespace-nowrap">{formatDate(c.consulado)}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline" className={
-                          c.situacao === 'Aprovado' ? 'bg-green-100 text-green-800 border-green-300' :
-                          c.situacao === 'Reprovado' ? 'bg-red-100 text-red-800 border-red-300' :
-                          c.situacao === 'CASV' ? 'bg-blue-100 text-blue-800 border-blue-300' :
-                          c.situacao === 'Aprovado só CASV' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
-                          c.situacao === 'Consulado' ? 'bg-violet-100 text-violet-800 border-violet-300' :
-                          c.situacao === 'Mudar Consulado' ? 'bg-blue-100 text-blue-800 border-blue-300' :
-                          'bg-gray-100 text-gray-800 border-gray-300'
-                        }>
-                          {c.situacao || 'Não definido'}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  biDetailModal.clientes.map(c => {
+                    const sit = (c.situacao || '').trim();
+                    return (
+                      <TableRow key={c.id} className="hover:bg-blue-50 cursor-pointer transition-colors" onClick={() => {
+                        setBiDetailModal(prev => ({ ...prev, open: false }));
+                        prepareEdit(c);
+                        setActiveTab('list');
+                      }}>
+                        <TableCell className="font-medium truncate" title={c.nome}>{c.nome}</TableCell>
+                        <TableCell className="truncate" title={c.agencia}>{c.agencia}</TableCell>
+                        <TableCell className="text-center truncate">{c.cidade || '-'}</TableCell>
+                        <TableCell className="text-center whitespace-nowrap">{formatDate(c.dataInclusao)}</TableCell>
+                        <TableCell className="text-center whitespace-nowrap">{formatDate(c.casv)}</TableCell>
+                        <TableCell className="text-center whitespace-nowrap">{formatDate(c.consulado)}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={
+                            sit === 'Aprovado' ? 'bg-green-100 text-green-800 border-green-300' :
+                            sit === 'Reprovado' ? 'bg-red-100 text-red-800 border-red-300' :
+                            sit === 'CASV' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                            sit === 'Aprovado só CASV' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                            sit === 'Consulado' ? 'bg-violet-100 text-violet-800 border-violet-300' :
+                            sit === 'Mudar Consulado' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                            'bg-gray-100 text-gray-800 border-gray-300'
+                          }>
+                            {sit || 'Não definido'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
