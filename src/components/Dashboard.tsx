@@ -71,7 +71,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const CIDADES = ['São Paulo', 'Rio de Janeiro', 'Brasilia', 'Porto Alegre', 'Recife'];
-const SITUACOES = ['Aguardando', 'Aprovado', 'Aprovado só CASV', 'CASV', 'Consulado', 'Reprovado'];
+const SITUACOES = ['Aguardando', 'Aprovado', 'Aprovado só CASV', 'CASV', 'Consulado', 'Mudar Consulado', 'Reprovado'];
 const TIPOS = ['Visto', 'Passaporte'];
 const ALL_VALUE = '__ALL__';
 const NONE_VALUE = '__NONE__';
@@ -168,6 +168,14 @@ export function Dashboard() {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '-';
+    if (typeof dateString !== 'string') {
+      try {
+        const d = new Date(dateString as any);
+        return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('pt-BR');
+      } catch {
+        return '-';
+      }
+    }
     const [year, month, day] = dateString.split('-');
     return `${day}/${month}/${year}`;
   };
@@ -227,26 +235,18 @@ export function Dashboard() {
 
   // Alert checks
   const checkConsuladoAlerts = () => {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    const cincoDiasFuturo = new Date(hoje);
-    cincoDiasFuturo.setDate(hoje.getDate() + 5);
-    // Mostrar alertas de Consulado APENAS quando situação for 'CASV' ou 'Consulado'
-    const situacoesValidas = ['CASV', 'Consulado'];
-
     return clientes.filter(c => {
-      if (c.deleted || c.tipo !== 'Visto') return false;
+      if (c.deleted) return false;
+      if (c.tipo !== 'Visto') return false;
+      // Verificar situação: normalizar espaços e considerar variações
+      const sit = (c.situacao || '').trim();
+      if (sit !== 'CASV' && sit !== 'Consulado') return false;
+      // Verificar se tem data de consulado válida
       if (!c.consulado) return false;
-      // Se estiver marcado para mudar de consulado, não mostrar no card Consulado
-      if (c.mudarConsulado) return false;
-      // Verificar se a situação é válida para mostrar alerta
-      if (!situacoesValidas.includes(c.situacao)) return false;
-      const dataConsulado = new Date(c.consulado);
+      const dataConsulado = new Date(c.consulado as any);
       if (isNaN(dataConsulado.getTime())) return false;
-      dataConsulado.setHours(0, 0, 0, 0);
-      if (dataConsulado > cincoDiasFuturo) return false;
       return true;
-    }).sort((a, b) => new Date(a.consulado).getTime() - new Date(b.consulado).getTime());
+    }).sort((a, b) => new Date(a.consulado as any).getTime() - new Date(b.consulado as any).getTime());
   };
 
   const checkCASVAlerts = () => {
@@ -261,7 +261,7 @@ export function Dashboard() {
       if (c.deleted || c.tipo !== 'Visto') return false;
       if (!c.casv) return false;
       // Verificar se a situação é válida para mostrar alerta
-      if (!situacoesValidas.includes(c.situacao)) return false;
+      if (!situacoesValidas.includes((c.situacao || '').trim())) return false;
       const dataCASV = new Date(c.casv);
       if (isNaN(dataCASV.getTime())) return false;
       dataCASV.setHours(0, 0, 0, 0);
@@ -271,20 +271,14 @@ export function Dashboard() {
   };
 
   const checkMudarConsuladoAlerts = () => {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    const cincoDiasFuturo = new Date(hoje);
-    cincoDiasFuturo.setDate(hoje.getDate() + 5);
-
     return clientes.filter(c => {
       if (c.deleted || c.tipo !== 'Visto') return false;
       if (!c.consulado) return false;
-      // Mostrar alerta somente se o checkbox Mudar Consulado estiver marcado
-      if (!c.mudarConsulado) return false;
+      // Mostrar alerta se o checkbox Mudar Consulado estiver marcado
+      // ou se a situação for 'Mudar Consulado' (dados antigos)
+      if (!c.mudarConsulado && (c.situacao || '').trim() !== 'Mudar Consulado') return false;
       const dataConsulado = new Date(c.consulado);
       if (isNaN(dataConsulado.getTime())) return false;
-      dataConsulado.setHours(0, 0, 0, 0);
-      // Mostrar o alerta a todo momento (removido a verificação dos 5 dias)
       return true;
     }).sort((a, b) => new Date(a.consulado).getTime() - new Date(b.consulado).getTime());
   };
