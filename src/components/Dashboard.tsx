@@ -64,7 +64,8 @@ import {
   Users,
   Calendar,
   Building,
-  PieChart
+  PieChart,
+  Clock
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
@@ -235,16 +236,21 @@ export function Dashboard() {
 
   // Alert checks
   const checkConsuladoAlerts = () => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const cincoDiasFuturo = new Date(hoje);
+    cincoDiasFuturo.setDate(hoje.getDate() + 5);
+
     return clientes.filter(c => {
       if (c.deleted) return false;
       if (c.tipo !== 'Visto') return false;
-      // Verificar situação: normalizar espaços e considerar variações
       const sit = (c.situacao || '').trim();
       if (sit !== 'CASV' && sit !== 'Consulado') return false;
-      // Verificar se tem data de consulado válida
       if (!c.consulado) return false;
       const dataConsulado = new Date(c.consulado as any);
       if (isNaN(dataConsulado.getTime())) return false;
+      dataConsulado.setHours(0, 0, 0, 0);
+      if (dataConsulado > cincoDiasFuturo) return false;
       return true;
     }).sort((a, b) => new Date(a.consulado as any).getTime() - new Date(b.consulado as any).getTime());
   };
@@ -283,9 +289,19 @@ export function Dashboard() {
     }).sort((a, b) => new Date(a.consulado).getTime() - new Date(b.consulado).getTime());
   };
 
+  const checkAguardandoAlerts = () => {
+    return clientes.filter(c => {
+      if (c.deleted) return false;
+      const sit = (c.situacao || '').trim();
+      if (sit !== 'Aguardando') return false;
+      return true;
+    });
+  };
+
   const consuladoAlerts = checkConsuladoAlerts();
   const casvAlerts = checkCASVAlerts();
   const mudarConsuladoAlerts = checkMudarConsuladoAlerts();
+  const aguardandoAlerts = checkAguardandoAlerts();
 
   // Filter clients
   const getFilteredClients = () => {
@@ -556,6 +572,7 @@ export function Dashboard() {
       }
       resetForm();
       loadClientes();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       console.error(error);
       toast({ title: 'Erro', description: 'Erro ao salvar no Firebase.', variant: 'destructive' });
@@ -590,7 +607,7 @@ export function Dashboard() {
       mudarConsulado: cliente.mudarConsulado || false
     });
     setEditingId(cliente.id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => document.getElementById('cliente-form')?.scrollIntoView({ behavior: 'smooth' }), 100);
   };
 
   const deleteClient = async (cliente: Cliente) => {
@@ -1220,18 +1237,18 @@ export function Dashboard() {
              </CardHeader>
             <CardContent className="pt-0">
               <div className="max-h-52 overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-blue-50">
-                    <tr className="text-left text-blue-700 font-medium">
-                      <th className="p-2">Nome</th>
-                      <th className="p-2">Agência</th>
-                      <th className="p-2">Data</th>
-                      <th className="p-2 text-center">Dias</th>
-                      <th className="p-2 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mudarConsuladoAlerts.map(c => {
+                 <table className="w-full text-sm table-fixed">
+                   <thead className="sticky top-0 bg-blue-50">
+                     <tr className="text-left text-blue-700 font-medium">
+                       <th className="p-2 w-[38%]">Nome</th>
+                       <th className="p-2 w-[22%]">Agência</th>
+                       <th className="p-2 w-[18%]">Data</th>
+                       <th className="p-2 w-[12%] text-center">Dias</th>
+                       <th className="p-2 w-10"></th>
+                     </tr>
+                   </thead>
+                   <tbody>
+                     {mudarConsuladoAlerts.map(c => {
                       const dias = Math.ceil((new Date(c.consulado).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
                       return (
                         <tr key={c.id} className="border-t border-blue-100 hover:bg-white/60 transition-colors">
@@ -1273,18 +1290,18 @@ export function Dashboard() {
             </CardHeader>
             <CardContent className="pt-0">
               <div className="max-h-52 overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-red-50">
-                    <tr className="text-left text-red-700 font-medium">
-                      <th className="p-2">Nome</th>
-                      <th className="p-2">Agência</th>
-                      <th className="p-2">Data</th>
-                      <th className="p-2 text-center">Dias</th>
-                      <th className="p-2 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {consuladoAlerts.map(c => {
+                 <table className="w-full text-sm table-fixed">
+                   <thead className="sticky top-0 bg-red-50">
+                     <tr className="text-left text-red-700 font-medium">
+                       <th className="p-2 w-[38%]">Nome</th>
+                       <th className="p-2 w-[22%]">Agência</th>
+                       <th className="p-2 w-[18%]">Data</th>
+                       <th className="p-2 w-[12%] text-center">Dias</th>
+                       <th className="p-2 w-10"></th>
+                     </tr>
+                   </thead>
+                   <tbody>
+                     {consuladoAlerts.map(c => {
                       const dias = Math.ceil((new Date(c.consulado).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
                       return (
                         <tr key={c.id} className="border-t border-red-100 hover:bg-white/60 transition-colors">
@@ -1326,18 +1343,18 @@ export function Dashboard() {
             </CardHeader>
             <CardContent className="pt-0">
               <div className="max-h-52 overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-amber-50">
-                    <tr className="text-left text-amber-700 font-medium">
-                      <th className="p-2">Nome</th>
-                      <th className="p-2">Agência</th>
-                      <th className="p-2">Data</th>
-                      <th className="p-2 text-center">Dias</th>
-                      <th className="p-2 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {casvAlerts.map(c => {
+                 <table className="w-full text-sm table-fixed">
+                   <thead className="sticky top-0 bg-amber-50">
+                     <tr className="text-left text-amber-700 font-medium">
+                       <th className="p-2 w-[38%]">Nome</th>
+                       <th className="p-2 w-[22%]">Agência</th>
+                       <th className="p-2 w-[18%]">Data</th>
+                       <th className="p-2 w-[12%] text-center">Dias</th>
+                       <th className="p-2 w-10"></th>
+                     </tr>
+                   </thead>
+                   <tbody>
+                     {casvAlerts.map(c => {
                       const dias = Math.ceil((new Date(c.casv).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
                       return (
                         <tr key={c.id} className="border-t border-amber-100 hover:bg-white/60 transition-colors">
@@ -1364,6 +1381,59 @@ export function Dashboard() {
           </Card>
         )}
 
+        {aguardandoAlerts.length > 0 && (
+          <Card className="border-purple-200 bg-purple-50 shadow-md">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-purple-800 text-base">
+                  <Clock className="w-5 h-5 text-purple-600" />
+                  AGUARDANDO
+                </CardTitle>
+                <Badge className="bg-purple-600 text-white font-bold px-2 py-1">
+                  {aguardandoAlerts.length}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="max-h-52 overflow-y-auto">
+                <table className="w-full text-sm table-fixed">
+                  <thead className="sticky top-0 bg-purple-50">
+                    <tr className="text-left text-purple-700 font-medium">
+                      <th className="p-2 w-[38%]">Nome</th>
+                      <th className="p-2 w-[22%]">Agência</th>
+                      <th className="p-2 w-[18%]">Data</th>
+                      <th className="p-2 w-[12%] text-center">Dias</th>
+                      <th className="p-2 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {aguardandoAlerts.map(c => {
+                      const dias = c.dataInclusao ? Math.ceil((new Date().getTime() - new Date(c.dataInclusao).getTime()) / (1000 * 60 * 60 * 24)) : null;
+                      return (
+                        <tr key={c.id} className="border-t border-purple-100 hover:bg-white/60 transition-colors">
+                          <td className="p-2 font-medium text-slate-800">{c.nome}</td>
+                          <td className="p-2 text-slate-600">{c.agencia}</td>
+                          <td className="p-2 text-slate-700">{formatDate(c.dataInclusao)}</td>
+                          <td className="p-2 text-center">
+                            <Badge className={`text-xs ${dias !== null && dias >= 30 ? 'bg-purple-600' : 'bg-purple-100 text-purple-700 border-purple-200'}`}>
+                              {dias !== null ? dias : '-'}
+                            </Badge>
+                          </td>
+                          <td className="p-2">
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-purple-100" onClick={() => prepareEdit(c)}>
+                              <Edit className="w-3.5 h-3.5" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
@@ -1374,7 +1444,7 @@ export function Dashboard() {
 
           <TabsContent value="list" className="space-y-6">
             {/* Form */}
-            <Card>
+            <Card id="cliente-form">
               <CardHeader>
                 <CardTitle className="text-lg">
                   {editingId ? '✏️ Editar Cliente' : '➕ Cadastrar Cliente'}
