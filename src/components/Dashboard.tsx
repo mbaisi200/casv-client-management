@@ -65,7 +65,8 @@ import {
   Calendar,
   Building,
   PieChart,
-  Clock
+  Clock,
+  Copy
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
@@ -542,6 +543,9 @@ export function Dashboard() {
       usuarioId: user?.uid
     } as HistoricoEntry);
 
+    const situacaoAtual = formData.situacao;
+    const mudarConsuladoFinal = situacaoAtual !== 'Mudar Consulado' ? false : formData.mudarConsulado;
+
     const clienteData = {
       nome: formData.nome.toUpperCase(),
       agencia: formData.agencia.toUpperCase(),
@@ -550,8 +554,8 @@ export function Dashboard() {
       dataInclusao: dataInclusaoVal,
       casv: formData.casv,
       consulado: formData.consulado,
-      situacao: formData.situacao,
-      mudarConsulado: formData.mudarConsulado,
+      situacao: situacaoAtual,
+      mudarConsulado: mudarConsuladoFinal,
       historico,
       updatedAt: serverTimestamp(),
       updatedBy: user?.email
@@ -680,7 +684,7 @@ export function Dashboard() {
       // Atualização otimista no estado local
       setClientes(prev => prev.map(cliente => 
         cliente.id === id 
-          ? { ...cliente, dataInclusao: '', casv: '', consulado: '', situacao: 'Aguardando' }
+          ? { ...cliente, dataInclusao: '', casv: '', consulado: '', situacao: 'Aguardando', mudarConsulado: false }
           : cliente
       ));
       
@@ -690,10 +694,55 @@ export function Dashboard() {
           casv: '',
           consulado: '',
           situacao: 'Aguardando',
+          mudarConsulado: false,
           updatedAt: serverTimestamp(),
           updatedBy: user?.email
         });
         toast({ title: 'Sucesso', description: 'Situação alterada para Aguardando. Dados gravados no banco.' });
+        loadClientes();
+      } catch (error) {
+        toast({ title: 'Erro', description: 'Erro ao atualizar no banco de dados.', variant: 'destructive' });
+        loadClientes();
+      }
+      return;
+    }
+
+    if (field === 'situacao') {
+      if (value === 'Mudar Consulado') {
+        setClientes(prev => prev.map(cliente =>
+          cliente.id === id
+            ? { ...cliente, situacao: 'Mudar Consulado', mudarConsulado: true }
+            : cliente
+        ));
+        try {
+          await updateDoc(doc(db, 'clientes', id), {
+            situacao: 'Mudar Consulado',
+            mudarConsulado: true,
+            updatedAt: serverTimestamp(),
+            updatedBy: user?.email
+          });
+          toast({ title: 'Sucesso', description: 'Situação alterada para Mudar Consulado.' });
+          loadClientes();
+        } catch (error) {
+          toast({ title: 'Erro', description: 'Erro ao atualizar no banco de dados.', variant: 'destructive' });
+          loadClientes();
+        }
+        return;
+      }
+
+      setClientes(prev => prev.map(cliente =>
+        cliente.id === id
+          ? { ...cliente, situacao: value, mudarConsulado: false }
+          : cliente
+      ));
+      try {
+        await updateDoc(doc(db, 'clientes', id), {
+          situacao: value,
+          mudarConsulado: false,
+          updatedAt: serverTimestamp(),
+          updatedBy: user?.email
+        });
+        toast({ title: 'Sucesso', description: `Situação alterada para ${value}.` });
         loadClientes();
       } catch (error) {
         toast({ title: 'Erro', description: 'Erro ao atualizar no banco de dados.', variant: 'destructive' });
@@ -1196,6 +1245,11 @@ export function Dashboard() {
     );
   }
 
+  const formatAlertCopy = (title: string, rows: { nome: string; agencia: string; data: string; dias: string }[]) => {
+    const lines = rows.map(r => `${r.nome} | ${r.agencia} | ${r.data} | ${r.dias}`);
+    return `${title}\n\n${lines.join('\n\n')}`;
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6 overflow-x-hidden">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -1230,9 +1284,26 @@ export function Dashboard() {
                    <AlertTriangle className="w-5 h-5 text-blue-600" />
                    MUDAR CONSULADO
                  </CardTitle>
-                 <Badge className="bg-blue-600 text-white font-bold px-2 py-1">
-                   {mudarConsuladoAlerts.length}
-                 </Badge>
+                 <div className="flex items-center gap-2">
+                   <Button
+                     size="sm"
+                     variant="ghost"
+                     className="h-7 px-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+                     onClick={() => {
+                       const rows = mudarConsuladoAlerts.map(c => {
+                         const dias = Math.ceil((new Date(c.consulado).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                         return { nome: c.nome, agencia: c.agencia, data: formatDate(c.consulado), dias: dias === 0 ? 'HOJE' : String(dias) };
+                       });
+                       navigator.clipboard.writeText(formatAlertCopy('MUDAR CONSULADO', rows));
+                       toast({ title: 'Copiado!', description: 'Dados copiados para a área de transferência.' });
+                     }}
+                   >
+                     <Copy className="w-3.5 h-3.5 mr-1" /> Copiar
+                   </Button>
+                   <Badge className="bg-blue-600 text-white font-bold px-2 py-1">
+                     {mudarConsuladoAlerts.length}
+                   </Badge>
+                 </div>
                </div>
              </CardHeader>
             <CardContent className="pt-0">
@@ -1283,9 +1354,26 @@ export function Dashboard() {
                   <AlertTriangle className="w-5 h-5 text-red-600" />
                   CONSULADO - 5 DIAS
                 </CardTitle>
-                <Badge className="bg-red-600 text-white font-bold px-2 py-1">
-                  {consuladoAlerts.length}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-red-600 hover:text-red-800 hover:bg-red-100"
+                    onClick={() => {
+                      const rows = consuladoAlerts.map(c => {
+                        const dias = Math.ceil((new Date(c.consulado).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                        return { nome: c.nome, agencia: c.agencia, data: formatDate(c.consulado), dias: dias === 0 ? 'HOJE' : String(dias) };
+                      });
+                      navigator.clipboard.writeText(formatAlertCopy('CONSULADO - 5 DIAS', rows));
+                      toast({ title: 'Copiado!', description: 'Dados copiados para a área de transferência.' });
+                    }}
+                  >
+                    <Copy className="w-3.5 h-3.5 mr-1" /> Copiar
+                  </Button>
+                  <Badge className="bg-red-600 text-white font-bold px-2 py-1">
+                    {consuladoAlerts.length}
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
@@ -1336,9 +1424,26 @@ export function Dashboard() {
                   <AlertTriangle className="w-5 h-5 text-amber-600" />
                   CASV - 5 DIAS
                 </CardTitle>
-                <Badge className="bg-amber-600 text-white font-bold px-2 py-1">
-                  {casvAlerts.length}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-amber-600 hover:text-amber-800 hover:bg-amber-100"
+                    onClick={() => {
+                      const rows = casvAlerts.map(c => {
+                        const dias = Math.ceil((new Date(c.casv).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                        return { nome: c.nome, agencia: c.agencia, data: formatDate(c.casv), dias: dias === 0 ? 'HOJE' : String(dias) };
+                      });
+                      navigator.clipboard.writeText(formatAlertCopy('CASV - 5 DIAS', rows));
+                      toast({ title: 'Copiado!', description: 'Dados copiados para a área de transferência.' });
+                    }}
+                  >
+                    <Copy className="w-3.5 h-3.5 mr-1" /> Copiar
+                  </Button>
+                  <Badge className="bg-amber-600 text-white font-bold px-2 py-1">
+                    {casvAlerts.length}
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
@@ -1389,9 +1494,26 @@ export function Dashboard() {
                   <Clock className="w-5 h-5 text-purple-600" />
                   AGUARDANDO
                 </CardTitle>
-                <Badge className="bg-purple-600 text-white font-bold px-2 py-1">
-                  {aguardandoAlerts.length}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-purple-600 hover:text-purple-800 hover:bg-purple-100"
+                    onClick={() => {
+                      const rows = aguardandoAlerts.map(c => {
+                        const dias = c.dataInclusao ? Math.ceil((new Date().getTime() - new Date(c.dataInclusao).getTime()) / (1000 * 60 * 60 * 24)) : null;
+                        return { nome: c.nome, agencia: c.agencia, data: formatDate(c.dataInclusao), dias: dias !== null ? String(dias) : '-' };
+                      });
+                      navigator.clipboard.writeText(formatAlertCopy('AGUARDANDO', rows));
+                      toast({ title: 'Copiado!', description: 'Dados copiados para a área de transferência.' });
+                    }}
+                  >
+                    <Copy className="w-3.5 h-3.5 mr-1" /> Copiar
+                  </Button>
+                  <Badge className="bg-purple-600 text-white font-bold px-2 py-1">
+                    {aguardandoAlerts.length}
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
@@ -1515,7 +1637,14 @@ export function Dashboard() {
                       </div>
 <div className="flex items-center gap-2">
                          <Label>Situação</Label>
-                         <Select value={formData.situacao || NONE_VALUE} onValueChange={v => setFormData(prev => ({ ...prev, situacao: v === NONE_VALUE ? '' : v }))}>
+                          <Select value={formData.situacao || NONE_VALUE} onValueChange={v => {
+                            const novaSituacao = v === NONE_VALUE ? '' : v;
+                            setFormData(prev => ({
+                              ...prev,
+                              situacao: novaSituacao,
+                              mudarConsulado: novaSituacao !== 'Mudar Consulado' ? false : true
+                            }));
+                          }}>
                            <SelectTrigger><SelectValue placeholder="-- Selecione --" /></SelectTrigger>
                            <SelectContent>
                              <SelectItem value={NONE_VALUE}>-- Selecione --</SelectItem>
@@ -1526,7 +1655,7 @@ export function Dashboard() {
                        <div className="flex items-center gap-2">
                          <Checkbox
                            checked={formData.mudarConsulado}
-                           onCheckedChange={checked => setFormData(prev => ({ ...prev, mudarConsulado: checked }))}
+                            onCheckedChange={checked => setFormData(prev => ({ ...prev, mudarConsulado: checked === true }))}
                          />
                          <span className="text-sm">Mudar de Consulado</span>
                        </div>
