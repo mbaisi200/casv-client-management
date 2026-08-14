@@ -11,7 +11,6 @@ import {
   updateDoc, 
   deleteDoc,
   query,
-  limit,
   serverTimestamp 
 } from 'firebase/firestore';
 import { Cliente, HistoricoEntry, FilterState, SortState } from '@/types';
@@ -77,6 +76,177 @@ const SITUACOES = ['Aguardando', 'Aprovado', 'Aprovado só CASV', 'CASV', 'Consu
 const TIPOS = ['Visto', 'Passaporte'];
 const ALL_VALUE = '__ALL__';
 const NONE_VALUE = '__NONE__';
+
+// ===== Componentes auxiliares para mobile (não afetam o layout desktop) =====
+
+type MobileAlertRow = {
+  id: string;
+  nome: string;
+  agencia: string;
+  data: string;
+  dias: string;
+  badgeClass: string;
+};
+
+function AlertMobileList({
+  rows,
+  onEdit,
+  borderClass,
+}: {
+  rows: MobileAlertRow[];
+  onEdit: (id: string) => void;
+  borderClass: string;
+}) {
+  return (
+    <div className="md:hidden space-y-2 pt-2">
+      {rows.map(r => (
+        <div key={r.id} className={`flex items-center justify-between gap-2 border rounded-lg bg-white/70 p-3 ${borderClass}`}>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-sm text-slate-800 truncate">{r.nome}</p>
+            <p className="text-xs text-slate-600 truncate">{r.agencia} • {r.data}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Badge className={r.badgeClass}>{r.dias}</Badge>
+            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onEdit(r.id)} title="Editar">
+              <Edit className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+type MobileClientCardProps = {
+  c: Cliente;
+  isConsuladoAlert: boolean;
+  isCASVAlert: boolean;
+  quickUpdate: (id: string, field: string, value: string) => void;
+  onEdit: (c: Cliente) => void;
+  onHistory: (c: Cliente) => void;
+  onDelete: (c: Cliente) => void;
+};
+
+const mobileFieldLabel = 'text-[10px] font-semibold uppercase tracking-wide text-slate-400 block';
+const mobileEditableField = 'text-sm text-slate-800 border-b border-dashed border-slate-300 focus:outline-none focus:border-blue-500 pb-0.5';
+
+function MobileClientCard({ c, isConsuladoAlert, isCASVAlert, quickUpdate, onEdit, onHistory, onDelete }: MobileClientCardProps) {
+  const borderClass = isConsuladoAlert
+    ? 'border-red-300 bg-red-50/60'
+    : isCASVAlert
+    ? 'border-amber-300 bg-amber-50/60'
+    : 'border-slate-200';
+
+  return (
+    <div className={`border rounded-lg p-3 space-y-2 ${borderClass}`}>
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <span className={mobileFieldLabel}>Nome</span>
+          <div
+            contentEditable
+            suppressContentEditableWarning
+            onBlur={e => quickUpdate(c.id, 'nome', e.currentTarget.textContent || '')}
+            className={`${mobileEditableField} font-medium`}
+            title={c.nome}
+          >
+            {c.nome}
+          </div>
+        </div>
+        <div className="flex gap-1 shrink-0">
+          <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => onEdit(c)} title="Editar">
+            <Edit className="w-4 h-4" />
+          </Button>
+          <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => onHistory(c)} title="Histórico">
+            <History className="w-4 h-4" />
+          </Button>
+          <Button size="icon" variant="destructive" className="h-8 w-8" onClick={() => onDelete(c)} title="Excluir">
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+
+      <div>
+        <span className={mobileFieldLabel}>Agência</span>
+        <div
+          contentEditable
+          suppressContentEditableWarning
+          onBlur={e => quickUpdate(c.id, 'agencia', e.currentTarget.textContent || '')}
+          className={mobileEditableField}
+          title={c.agencia}
+        >
+          {c.agencia}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+        <div>
+          <span className={mobileFieldLabel}>Tipo</span>
+          <Select value={c.tipo || 'Visto'} onValueChange={v => quickUpdate(c.id, 'tipo', v)}>
+            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <span className={mobileFieldLabel}>Cidade</span>
+          <Select value={c.cidade || NONE_VALUE} onValueChange={v => quickUpdate(c.id, 'cidade', v === NONE_VALUE ? '' : v)}>
+            <SelectTrigger className="w-full"><SelectValue placeholder="Selecione" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE_VALUE}>Selecione</SelectItem>
+              {CIDADES.map(ci => <SelectItem key={ci} value={ci}>{ci}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <span className={mobileFieldLabel}>Inclusão</span>
+          <Input
+            type="date"
+            defaultValue={c.dataInclusao}
+            onBlur={e => quickUpdate(c.id, 'dataInclusao', e.target.value)}
+            className="h-9 w-full"
+          />
+        </div>
+        {c.tipo === 'Visto' ? (
+          <>
+            <div>
+              <span className={mobileFieldLabel}>CASV</span>
+              <Input
+                type="date"
+                defaultValue={c.casv}
+                onBlur={e => quickUpdate(c.id, 'casv', e.target.value)}
+                className="h-9 w-full"
+              />
+            </div>
+            <div>
+              <span className={mobileFieldLabel}>Consulado</span>
+              <Input
+                type="date"
+                defaultValue={c.consulado}
+                onBlur={e => quickUpdate(c.id, 'consulado', e.target.value)}
+                className="h-9 w-full"
+              />
+            </div>
+            <div className="col-span-2">
+              <span className={mobileFieldLabel}>Situação</span>
+              <Select value={c.situacao || NONE_VALUE} onValueChange={v => quickUpdate(c.id, 'situacao', v === NONE_VALUE ? '' : v)}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="--" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE_VALUE}>--</SelectItem>
+                  {SITUACOES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        ) : (
+          <div className="col-span-2 flex items-end">
+            <Badge variant="outline" className="bg-amber-100 text-amber-800">PASSAPORTE</Badge>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function Dashboard() {
   const { user, dbStatus, logout } = useAuth();
@@ -1256,7 +1426,7 @@ export function Dashboard() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-4 rounded-lg shadow-sm">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">📋 Gerenciamento de Clientes CASV</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-slate-800">📋 Gerenciamento de Clientes CASV</h1>
             <div className="flex items-center gap-2 mt-1">
               <div className={`w-2.5 h-2.5 rounded-full ${dbStatus === 'online' ? 'bg-green-500' : dbStatus === 'offline' ? 'bg-red-500' : 'bg-gray-400'}`} />
               <span className={`text-sm ${dbStatus === 'online' ? 'text-green-600' : dbStatus === 'offline' ? 'text-red-600' : 'text-gray-500'}`}>
@@ -1264,8 +1434,8 @@ export function Dashboard() {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-blue-700">{user?.email}</span>
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
+            <span className="text-sm font-medium text-blue-700 break-all">{user?.email}</span>
             <Button variant="outline" size="sm" onClick={() => { resetForm(); loadClientes(); }}>
               <Home className="w-4 h-4 mr-1" /> Início
             </Button>
@@ -1307,7 +1477,7 @@ export function Dashboard() {
                </div>
              </CardHeader>
             <CardContent className="pt-0">
-              <div className="max-h-52 overflow-y-auto">
+              <div className="max-h-52 overflow-y-auto hidden md:block">
                  <table className="w-full text-sm table-fixed">
                    <thead className="sticky top-0 bg-blue-50">
                      <tr className="text-left text-blue-700 font-medium">
@@ -1342,6 +1512,24 @@ export function Dashboard() {
                   </tbody>
                 </table>
               </div>
+              <AlertMobileList
+                rows={mudarConsuladoAlerts.map(c => {
+                  const dias = Math.ceil((new Date(c.consulado).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                  return {
+                    id: c.id,
+                    nome: c.nome,
+                    agencia: c.agencia,
+                    data: formatDate(c.consulado),
+                    dias: dias === 0 ? 'HOJE' : String(dias),
+                    badgeClass: dias <= 2 ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700 border-blue-200'
+                  };
+                })}
+                onEdit={(id) => {
+                  const cl = mudarConsuladoAlerts.find(a => a.id === id);
+                  if (cl) prepareEdit(cl);
+                }}
+                borderClass="border-blue-200"
+              />
             </CardContent>
           </Card>
         )}
@@ -1377,7 +1565,7 @@ export function Dashboard() {
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="max-h-52 overflow-y-auto">
+              <div className="max-h-52 overflow-y-auto hidden md:block">
                  <table className="w-full text-sm table-fixed">
                    <thead className="sticky top-0 bg-red-50">
                      <tr className="text-left text-red-700 font-medium">
@@ -1412,6 +1600,24 @@ export function Dashboard() {
                   </tbody>
                 </table>
               </div>
+              <AlertMobileList
+                rows={consuladoAlerts.map(c => {
+                  const dias = Math.ceil((new Date(c.consulado).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                  return {
+                    id: c.id,
+                    nome: c.nome,
+                    agencia: c.agencia,
+                    data: formatDate(c.consulado),
+                    dias: dias === 0 ? 'HOJE' : String(dias),
+                    badgeClass: dias <= 2 ? 'bg-red-600 text-white' : 'bg-red-100 text-red-700 border-red-200'
+                  };
+                })}
+                onEdit={(id) => {
+                  const cl = consuladoAlerts.find(a => a.id === id);
+                  if (cl) prepareEdit(cl);
+                }}
+                borderClass="border-red-200"
+              />
             </CardContent>
           </Card>
         )}
@@ -1447,7 +1653,7 @@ export function Dashboard() {
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="max-h-52 overflow-y-auto">
+              <div className="max-h-52 overflow-y-auto hidden md:block">
                  <table className="w-full text-sm table-fixed">
                    <thead className="sticky top-0 bg-amber-50">
                      <tr className="text-left text-amber-700 font-medium">
@@ -1482,6 +1688,24 @@ export function Dashboard() {
                   </tbody>
                 </table>
               </div>
+              <AlertMobileList
+                rows={casvAlerts.map(c => {
+                  const dias = Math.ceil((new Date(c.casv).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                  return {
+                    id: c.id,
+                    nome: c.nome,
+                    agencia: c.agencia,
+                    data: formatDate(c.casv),
+                    dias: dias === 0 ? 'HOJE' : String(dias),
+                    badgeClass: dias <= 2 ? 'bg-amber-600 text-white' : 'bg-amber-100 text-amber-700 border-amber-200'
+                  };
+                })}
+                onEdit={(id) => {
+                  const cl = casvAlerts.find(a => a.id === id);
+                  if (cl) prepareEdit(cl);
+                }}
+                borderClass="border-amber-200"
+              />
             </CardContent>
           </Card>
         )}
@@ -1517,7 +1741,7 @@ export function Dashboard() {
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="max-h-52 overflow-y-auto">
+              <div className="max-h-52 overflow-y-auto hidden md:block">
                 <table className="w-full text-sm table-fixed">
                   <thead className="sticky top-0 bg-purple-50">
                     <tr className="text-left text-purple-700 font-medium">
@@ -1552,13 +1776,31 @@ export function Dashboard() {
                   </tbody>
                 </table>
               </div>
+              <AlertMobileList
+                rows={aguardandoAlerts.map(c => {
+                  const dias = c.dataInclusao ? Math.ceil((new Date().getTime() - new Date(c.dataInclusao).getTime()) / (1000 * 60 * 60 * 24)) : null;
+                  return {
+                    id: c.id,
+                    nome: c.nome,
+                    agencia: c.agencia,
+                    data: formatDate(c.dataInclusao),
+                    dias: dias !== null ? String(dias) : '-',
+                    badgeClass: dias !== null && dias >= 30 ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700 border-purple-200'
+                  };
+                })}
+                onEdit={(id) => {
+                  const cl = aguardandoAlerts.find(a => a.id === id);
+                  if (cl) prepareEdit(cl);
+                }}
+                borderClass="border-purple-200"
+              />
             </CardContent>
           </Card>
         )}
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
+          <TabsList className="flex-wrap w-full h-auto gap-y-1 md:w-fit">
             <TabsTrigger value="list">📋 Lista de Clientes</TabsTrigger>
             <TabsTrigger value="bi">📊 BI / Dashboard</TabsTrigger>
             <TabsTrigger value="reports">📄 Relatórios</TabsTrigger>
@@ -1757,7 +1999,7 @@ export function Dashboard() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between mt-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 mt-4">
                   <Button 
                     variant={showHidden ? 'default' : 'outline'}
                     onClick={() => setShowHidden(!showHidden)}
@@ -1776,6 +2018,7 @@ export function Dashboard() {
             {/* Table */}
             <Card>
               <CardContent className="p-0">
+                <div className="hidden md:block">
                   <Table className="table-fixed w-full">
                     <TableHeader>
                       <TableRow>
@@ -1912,14 +2155,38 @@ export function Dashboard() {
                             </TableRow>
                           );
                         })
-                      )}
-                    </TableBody>
+                      )}                    </TableBody>
                   </Table>
+                </div>
+                {/* Mobile: clientes empilhados em cards */}
+                <div className="md:hidden divide-y divide-slate-100">
+                  {filteredClientes.length === 0 ? (
+                    <p className="text-center py-8 text-slate-500">Nenhum cliente encontrado</p>
+                  ) : (
+                    filteredClientes.map(c => {
+                      const isConsuladoAlert = consuladoAlerts.some(a => a.id === c.id);
+                      const isCASVAlert = casvAlerts.some(a => a.id === c.id);
+                      return (
+                        <MobileClientCard
+                          key={c.id}
+                          c={c}
+                          isConsuladoAlert={isConsuladoAlert}
+                          isCASVAlert={isCASVAlert}
+                          quickUpdate={quickUpdate}
+                          onEdit={prepareEdit}
+                          onHistory={cl => setHistoryDialog({ open: true, cliente: cl })}
+                          onDelete={deleteClient}
+                        />
+                      );
+                    })
+                  )}
+                </div>
               </CardContent>
             </Card>
 
+
             {/* Export buttons */}
-            <div className="flex justify-center gap-4">
+            <div className="flex flex-wrap justify-center gap-2 md:gap-4">
               <Button variant="outline" onClick={() => exportListPDF(filteredClientes, 'lista_clientes.pdf')}>
                 <FileText className="w-4 h-4 mr-1" /> Exportar PDF
               </Button>
@@ -2088,7 +2355,7 @@ export function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto hidden md:block">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -2115,6 +2382,39 @@ export function Dashboard() {
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+                {/* Mobile: por agência empilhado */}
+                <div className="md:hidden space-y-2">
+                  {Object.entries(biStats.byAgency).sort(([,a], [,b]) => (b.vistos + b.passaportes) - (a.vistos + a.passaportes)).map(([agencia, data]) => (
+                    <div key={agencia} className="border rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-sm truncate">{agencia}</span>
+                        <span className="text-sm font-bold">{data.vistos + data.passaportes}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="flex items-center justify-between rounded bg-blue-50 px-2 py-1.5">
+                          <span className="text-xs text-slate-600">Vistos</span>
+                          <Badge className="bg-blue-100 text-blue-800">{data.vistos}</Badge>
+                        </div>
+                        <div className="flex items-center justify-between rounded bg-amber-50 px-2 py-1.5">
+                          <span className="text-xs text-slate-600">Passaportes</span>
+                          <Badge className="bg-amber-100 text-amber-800">{data.passaportes}</Badge>
+                        </div>
+                        <div className="flex items-center justify-between rounded bg-green-50 px-2 py-1.5">
+                          <span className="text-xs text-slate-600">Aprovados</span>
+                          <Badge className="bg-green-100 text-green-800">{(data.situacoes['Aprovado'] || 0) + (data.situacoes['Aprovado só CASV'] || 0)}</Badge>
+                        </div>
+                        <div className="flex items-center justify-between rounded bg-red-50 px-2 py-1.5">
+                          <span className="text-xs text-slate-600">Reprovados</span>
+                          <Badge className="bg-red-100 text-red-800">{data.situacoes['Reprovado'] || 0}</Badge>
+                        </div>
+                        <div className="col-span-2 flex items-center justify-between rounded bg-purple-50 px-2 py-1.5">
+                          <span className="text-xs text-slate-600">Pendentes</span>
+                          <Badge className="bg-purple-100 text-purple-800">{(data.situacoes['Aguardando'] || 0) + (data.situacoes['CASV'] || 0) + (data.situacoes['Consulado'] || 0)}</Badge>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -2163,8 +2463,8 @@ export function Dashboard() {
                     const approvalRate = data.total > 0 ? ((data.aprovados / data.total) * 100).toFixed(0) : 0;
                     
                     return (
-                      <div key={month} className="flex items-center gap-4">
-                        <div className="w-28 text-sm font-medium capitalize">{monthName}</div>
+                      <div key={month} className="flex items-center gap-3 md:gap-4">
+                        <div className="w-24 md:w-28 text-xs md:text-sm font-medium capitalize">{monthName}</div>
                         <div className="flex-1">
                           <div className="h-6 bg-slate-100 rounded-full overflow-hidden">
                             <div 
@@ -2175,9 +2475,9 @@ export function Dashboard() {
                             </div>
                           </div>
                         </div>
-                        <div className="w-20 text-sm text-right">
+                        <div className="w-16 md:w-20 text-xs md:text-sm text-right">
                           <span className="text-green-600 font-medium">{approvalRate}%</span>
-                          <span className="text-slate-400 text-xs"> apr.</span>
+                          <span className="text-slate-400 text-[10px] md:text-xs"> apr.</span>
                         </div>
                       </div>
                     );
@@ -2262,6 +2562,7 @@ export function Dashboard() {
             </DialogDescription>
           </DialogHeader>
           <div className="overflow-auto flex-1 px-6 py-4">
+            <div className="hidden md:block">
             <Table className="w-full table-fixed min-w-[1120px]">
               <TableHeader>
                 <TableRow className="bg-slate-100">
@@ -2315,6 +2616,47 @@ export function Dashboard() {
                 )}
               </TableBody>
             </Table>
+            </div>
+            {/* Mobile: lista empilhada */}
+            <div className="md:hidden space-y-2">
+              {biDetailModal.clientes.length === 0 ? (
+                <p className="text-center py-12 text-slate-500 text-lg">Nenhum cliente encontrado</p>
+              ) : (
+                biDetailModal.clientes.map(c => {
+                  const sit = (c.situacao || '').trim();
+                  return (
+                    <div
+                      key={c.id}
+                      className="border rounded-lg p-3 space-y-1.5 hover:bg-blue-50 cursor-pointer transition-colors"
+                      onClick={() => {
+                        setBiDetailModal(prev => ({ ...prev, open: false }));
+                        prepareEdit(c);
+                        setActiveTab('list');
+                      }}
+                    >
+                      <p className="font-medium text-sm truncate" title={c.nome}>{c.nome}</p>
+                      <p className="text-xs text-slate-600 truncate">{c.agencia}{c.cidade ? ` • ${c.cidade}` : ''}</p>
+                      <div className="grid grid-cols-3 gap-1 text-xs text-slate-600">
+                        <div>Incl: <span className="font-medium text-slate-800">{formatDate(c.dataInclusao)}</span></div>
+                        <div>CASV: <span className="font-medium text-slate-800">{formatDate(c.casv)}</span></div>
+                        <div>Cons: <span className="font-medium text-slate-800">{formatDate(c.consulado)}</span></div>
+                      </div>
+                      <Badge variant="outline" className={
+                        sit === 'Aprovado' ? 'bg-green-100 text-green-800 border-green-300' :
+                        sit === 'Reprovado' ? 'bg-red-100 text-red-800 border-red-300' :
+                        sit === 'CASV' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                        sit === 'Aprovado só CASV' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                        sit === 'Consulado' ? 'bg-violet-100 text-violet-800 border-violet-300' :
+                        sit === 'Mudar Consulado' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                        'bg-gray-100 text-gray-800 border-gray-300'
+                      }>
+                        {sit || 'Não definido'}
+                      </Badge>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
           <DialogFooter className="px-6 py-4 border-t bg-slate-50 gap-3">
             <Button variant="outline" size="lg" onClick={() => setBiDetailModal(prev => ({ ...prev, open: false }))}>
